@@ -6,47 +6,52 @@ import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.content.pm.PackageManager
+import android.net.wifi.WifiManager
 import android.net.wifi.WpsInfo
 import android.net.wifi.p2p.*
 import android.net.wifi.p2p.nsd.WifiP2pDnsSdServiceInfo
 import android.net.wifi.p2p.nsd.WifiP2pDnsSdServiceRequest
-import android.os.Build
 import android.os.Bundle
 import android.widget.Button
-import androidx.annotation.RequiresApi
+import android.widget.TextView
+import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import java.io.InputStream
 import java.io.OutputStream
-import java.net.InetAddress
 import java.net.InetSocketAddress
 import java.net.ServerSocket
 import java.net.Socket
 import java.util.concurrent.Executors
 import kotlin.concurrent.thread
 
-
 class MainActivity : AppCompatActivity() {
     private val manager: WifiP2pManager by lazy { getSystemService(Context.WIFI_P2P_SERVICE) as WifiP2pManager }
+    private val managerWifi: WifiManager by lazy { applicationContext.getSystemService(Context.WIFI_SERVICE) as WifiManager }
     var channel: WifiP2pManager.Channel? = null
     private var receiver: BroadcastReceiver? = null
     private val intentFilter = IntentFilter().apply {
 //        addAction(WifiP2pManager.WIFI_P2P_STATE_CHANGED_ACTION)
-//        addAction(WifiP2pManager.WIFI_P2P_PEERS_CHANGED_ACTION)
+        addAction(WifiP2pManager.WIFI_P2P_PEERS_CHANGED_ACTION)
         addAction(WifiP2pManager.WIFI_P2P_CONNECTION_CHANGED_ACTION)
 //        addAction(WifiP2pManager.WIFI_P2P_THIS_DEVICE_CHANGED_ACTION)
     }
-    private val connected = mutableListOf<WifiP2pDevice>()
-    lateinit var mysocket:WiFiDirectBroadcastReceiver.MySocket
+    val connected = mutableListOf<WifiP2pDevice>()
+    private lateinit var mysocket:WiFiDirectBroadcastReceiver.MySocket
     lateinit var mConnectionInfoListener: WifiP2pManager.ConnectionInfoListener
 
     var isRunning = true
     var isWantDiscoverPeers = false
-    var isWantCheckConnection = false
     var isShouldBeConnected = false
+    var isConnected = false
+    var isSocketCreated = false
+    var isWantPeerUpdate = false
 
-    val threadHost = thread {
+    val logs = mutableListOf<String>()
+    lateinit var vLogger:TextView
+
+    val thread = thread {
         while (isRunning) {
-            Thread.sleep(10_000)
+            Thread.sleep(1_000)
 
             if(isWantDiscoverPeers) {
                 manager.discoverPeers(
@@ -57,10 +62,11 @@ class MainActivity : AppCompatActivity() {
 
                             manager.requestPeers(channel) {
                                 it.deviceList.forEach {
-                                    if(Build.VERSION.SDK_INT >= 29 && !connected.contains(it)) {
-                                        println("device ${it.deviceName}")
+                                    if(!connected.contains(it)) {
+                                        log("found device ${it.deviceName} ${it.deviceAddress}")
                                         connected.add(it)
 
+                                        //  connect from host
                                         val config = WifiP2pConfig().apply {
                                             deviceAddress = it.deviceAddress
                                             wps.setup = WpsInfo.PBC
@@ -82,10 +88,6 @@ class MainActivity : AppCompatActivity() {
                         override fun onFailure(error: Int) {}
                     })
             }
-
-            if(isWantCheckConnection) {
-                manager.requestConnectionInfo(channel, mConnectionInfoListener)
-            }
         }
     }
 
@@ -101,11 +103,47 @@ class MainActivity : AppCompatActivity() {
 
         if (permissions.isNotEmpty()) this.requestPermissions(permissions, 0)
 
+        //  ui
+        val vHost = findViewById<Button>(R.id.buttonHost)
+        val vClient = findViewById<Button>(R.id.buttonClient)
+        val vPing = findViewById<Button>(R.id.buttonPing)
+        vLogger = findViewById(R.id.logger)
+
+        vHost.setOnClickListener {
+            setHost()
+            vHost.isEnabled=false
+            vClient.isEnabled=false
+            isShouldBeConnected=true
+            isWantPeerUpdate=true
+        }
+
+        vClient.setOnClickListener {
+            discover()
+            vHost.isEnabled=false
+            vClient.isEnabled=false
+            isShouldBeConnected=true
+        }
+
+        vPing.setOnClickListener {
+            if(this::mysocket.isInitialized)
+                mysocket.write("ping".encodeToByteArray())
+        }
+
+        //  setup
+        val ipAddress = managerWifi.connectionInfo.ipAddress
+        log("${ipAddress and 0xff}.${(ipAddress shr 8) and 0xff}.${(ipAddress shr 16) and 0xff}.${(ipAddress shr 24) and 0xff}")
         channel = manager.initialize(this, mainLooper, null)
         receiver = WiFiDirectBroadcastReceiver(manager, channel!!, this)
 
         mConnectionInfoListener = WifiP2pManager.ConnectionInfoListener { info ->
-            println("connection changed: formed = ${info.groupFormed}, isOwner = ${info.isGroupOwner}")
+            log("connection: formed = ${info.groupFormed}, isOwner = ${info.isGroupOwner}")
+
+            if(!isConnected && info.groupFormed) {
+                log("CONNECTED (${info.groupOwnerAddress.hostAddress})")
+            }
+            if(isConnected && !info.groupFormed) {
+                log("DISCONNECTED")
+            }
 
             if(info.groupFormed && !isShouldBeConnected) {
                 manager.requestGroupInfo(channel) { group ->
@@ -125,31 +163,16 @@ class MainActivity : AppCompatActivity() {
                 }
             }
 
-            if(isShouldBeConnected && info.groupFormed) {
+            if(isShouldBeConnected && info.groupFormed && !isSocketCreated) {
                 mysocket =
                     if(info.isGroupOwner) WiFiDirectBroadcastReceiver.ServerThread(this)
-                    else WiFiDirectBroadcastReceiver.ClientThread(this, info.groupOwnerAddress)
-
-                isWantCheckConnection=false
+                    else WiFiDirectBroadcastReceiver.ClientThread(this, info.groupOwnerAddress.hostAddress!!)
+                isSocketCreated=true
             }
-        }
 
-        val vHost = findViewById<Button>(R.id.buttonHost)
-        val vClient = findViewById<Button>(R.id.buttonClient)
-
-        vHost.setOnClickListener {
-            setHost()
-            vHost.isEnabled=false
-            vClient.isEnabled=false
-            isShouldBeConnected=true
+            isConnected = info.groupFormed
         }
-
-        vClient.setOnClickListener {
-            discover()
-            vHost.isEnabled=false
-            vClient.isEnabled=false
-            isShouldBeConnected=true
-        }
+        manager.requestConnectionInfo(channel, mConnectionInfoListener)
     }
 
     override fun onResume() {
@@ -173,23 +196,24 @@ class MainActivity : AppCompatActivity() {
 
     fun discover() {
         discoverNSD()
+        WiFiDirectBroadcastReceiver.ServerThread(this)
     }
 
     private fun discoverNSD() {
-//        manager.setDnsSdResponseListeners(channel,
-//            { instanceName, registrationType, resourceType ->
-//                println("servListener $instanceName")
-//                // Update the device name with the human-friendly version from
-//                // the DnsTxtRecord, assuming one arrived.
+        manager.setDnsSdResponseListeners(channel,
+            { instanceName, registrationType, resourceType ->
+                println("servListener $instanceName")
+                // Update the device name with the human-friendly version from
+                // the DnsTxtRecord, assuming one arrived.
 //                resourceType.deviceName = buddies[resourceType.deviceAddress] ?: resourceType.deviceName
-//            },
-//            { fullDomain, record, device ->
-//                println("DnsSdTxtRecord available -$record")
-//                println("device ${device.deviceAddress} ${device.deviceName}")
+            },
+            { fullDomain, record, device ->
+                println("DnsSdTxtRecord available -$record")
+                println("device ${device.deviceAddress} ${device.deviceName}")
 //                record["buddyname"]?.also {
 //                    buddies[device.deviceAddress] = it
 //                }
-//        })
+        })
 
         val serviceRequest = WifiP2pDnsSdServiceRequest.newInstance()
 
@@ -209,7 +233,6 @@ class MainActivity : AppCompatActivity() {
                                 object : WifiP2pManager.ActionListener {
                                     override fun onSuccess() {
                                         println("discoverServices success")
-                                        isWantCheckConnection=true
                                     }
 
                                     override fun onFailure(code: Int) {
@@ -258,37 +281,6 @@ class MainActivity : AppCompatActivity() {
         // information other devices will want once they connect to this one.
         val serviceInfo = WifiP2pDnsSdServiceInfo.newInstance("_test", "_presence._tcp", txtMap)
 
-        //  create group
-
-//        manager.createGroup(channel, object : WifiP2pManager.ActionListener {
-//            override fun onSuccess() {
-//                println("createGroup success")
-//            }
-//
-//            override fun onFailure(reason: Int) {
-//                println("createGroup failure $reason")
-//                manager.removeGroup(channel, object :WifiP2pManager.ActionListener {
-//                    override fun onSuccess() {
-//                        println("removeGroup success")
-//
-//                        manager.createGroup(channel, object : WifiP2pManager.ActionListener {
-//                            override fun onSuccess() {
-//                                println("createGroup success")
-//                            }
-//
-//                            override fun onFailure(reason: Int) {
-//                                println("createGroup failure $reason")
-//                            }
-//                        })
-//                    }
-//
-//                    override fun onFailure(p0: Int) {
-//                        println("removeGroup failure")
-//                    }
-//                })
-//            }
-//        })
-
         //  create service
         manager.clearLocalServices(channel, object : WifiP2pManager.ActionListener {
             override fun onSuccess() {
@@ -309,6 +301,21 @@ class MainActivity : AppCompatActivity() {
             }
         })
     }
+
+    fun onRead(buffer: ByteArray, len:Int) {
+        val s = String(buffer, 0, len)
+        runOnUiThread {
+            Toast.makeText(this, s, Toast.LENGTH_LONG).show()
+        }
+    }
+
+    fun log(string: String) {
+        println(string)
+        logs.add(string)
+        runOnUiThread {
+            vLogger.text = logs.takeLast(20).joinToString("\n")
+        }
+    }
 }
 
 class WiFiDirectBroadcastReceiver(
@@ -325,95 +332,109 @@ class WiFiDirectBroadcastReceiver(
                 // Respond to new connection or disconnections
                 manager.requestConnectionInfo(channel, activity.mConnectionInfoListener)
             }
-        }
-    }
+            WifiP2pManager.WIFI_P2P_PEERS_CHANGED_ACTION -> {
+                println("WIFI_P2P_PEERS_CHANGED_ACTION")
 
-    interface MySocket {
-        val onReadListeners:MutableList<(buffer:ByteArray, len:Int) -> Unit>
-        fun write(byteArray: ByteArray)
-    }
-
-    class ClientThread(private val mainActivity: MainActivity, inetAddress: InetAddress): Thread(),MySocket {
-        private val hostAddress:String
-        private lateinit var mOutputStream: OutputStream
-        private lateinit var mInputStream: InputStream
-        val socket:Socket
-        override val onReadListeners: MutableList<(buffer: ByteArray, len: Int) -> Unit> = mutableListOf()
-
-        init {
-            hostAddress = inetAddress.hostAddress!!
-            socket = Socket()
-        }
-
-        override fun write(byteArray: ByteArray) {
-            try {
-                mOutputStream.write(byteArray)
-            } catch (e:Exception) {
-                e.printStackTrace()
-            }
-        }
-
-        override fun run() {
-            socket.connect(InetSocketAddress(hostAddress, 8888), 3000)
-            mInputStream = socket.getInputStream()
-            mOutputStream = socket.getOutputStream()
-
-            val executor = Executors.newSingleThreadExecutor()
-
-            executor.execute {
-                val buffer = ByteArray(1024)
-                var bytes:Int
-
-                while(mainActivity.isRunning) {
-                    try {
-                        bytes = mInputStream.read(buffer)
-                        if(bytes > 0) {
-                            val finalBytes = bytes
-                            //buffer, bytes
-                        }
-                    } catch (e:Exception) {
-                        e.printStackTrace()
+                if(activity.isWantPeerUpdate) {
+                    manager.requestPeers(channel) { list ->
+                        activity.connected.filter { !list.deviceList.contains(it) }
+                            .forEach {
+                                activity.log("deice lost ${it.deviceName}")
+                            }
                     }
                 }
             }
         }
     }
 
-    class ServerThread(private val mainActivity: MainActivity): Thread(), MySocket {
-        private var serverSocket:ServerSocket = ServerSocket(8888)
+    interface MySocket {
+        val onReadListener:(buffer:ByteArray, len:Int) -> Unit
+        fun write(byteArray: ByteArray)
+    }
+
+    class ClientThread(private val mainActivity: MainActivity, private val inetAddress: String): MySocket {
         private lateinit var mOutputStream: OutputStream
         private lateinit var mInputStream: InputStream
-        override val onReadListeners: MutableList<(buffer: ByteArray, len: Int) -> Unit> = mutableListOf()
+        private val socket:Socket = Socket()
+        override val onReadListener: (buffer: ByteArray, len: Int) -> Unit = { buffer, len -> mainActivity.onRead(buffer, len) }
 
-        override fun write(byteArray: ByteArray) {
-            try {
-                mOutputStream.write(byteArray)
-            } catch (e:Exception) {
-                e.printStackTrace()
+        init {
+            thread {
+                mainActivity.log("socket client creating ${inetAddress}")
+                socket.connect(InetSocketAddress(inetAddress, 8888), 3000)
+                mInputStream = socket.getInputStream()
+                mOutputStream = socket.getOutputStream()
+                mainActivity.log("socket client created")
+
+                val executor = Executors.newSingleThreadExecutor()
+
+                executor.execute {
+                    val buffer = ByteArray(1024)
+                    var bytes:Int
+
+                    while(mainActivity.isRunning) {
+                        try {
+                            bytes = mInputStream.read(buffer)
+                            if(bytes > 0) onReadListener(buffer, bytes)
+                        } catch (e:Exception) {
+                            e.printStackTrace()
+                            break;
+                            mainActivity.log("socket broken")
+                        }
+                    }
+                }
             }
         }
 
-        override fun run() {
-            val socket  = serverSocket.accept()
-            mInputStream = socket.getInputStream()
-            mOutputStream = socket.getOutputStream()
+        override fun write(byteArray: ByteArray) {
+            thread {
+                try {
+                    mOutputStream.write(byteArray)
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                }
+            }
+        }
+    }
 
-            val executor = Executors.newSingleThreadExecutor()
+    class ServerThread(private val mainActivity: MainActivity): MySocket {
+        private var serverSocket:ServerSocket = ServerSocket(8888)
+        private lateinit var mOutputStream: OutputStream
+        private lateinit var mInputStream: InputStream
+        override val onReadListener: (buffer: ByteArray, len: Int) -> Unit = { buffer, len -> mainActivity.onRead(buffer, len) }
 
-            executor.execute {
-                val buffer = ByteArray(1024)
-                var bytes:Int
+        init {
+            thread {
+                mainActivity.log("socket server creating")
+                val socket  = serverSocket.accept()
+                mInputStream = socket.getInputStream()
+                mOutputStream = socket.getOutputStream()
+                mainActivity.log("socket server created")
 
-                while(mainActivity.isRunning) {
-                    try {
-                        bytes = mInputStream.read(buffer)
-                        if(bytes > 0) {
-                            val finalBytes = bytes
+                val executor = Executors.newSingleThreadExecutor()
 
+                executor.execute {
+                    val buffer = ByteArray(1024)
+                    var bytes:Int
+
+                    while(mainActivity.isRunning) {
+                        try {
+                            bytes = mInputStream.read(buffer)
+                            if(bytes > 0) onReadListener(buffer, bytes)
+                        } catch (e:Exception) {
+                            e.printStackTrace()
                         }
-                    } catch (e:Exception) {
-                        e.printStackTrace()
                     }
+                }
+            }
+        }
+
+        override fun write(byteArray: ByteArray) {
+            thread {
+                try {
+                    mOutputStream.write(byteArray)
+                } catch (e: Exception) {
+                    e.printStackTrace()
                 }
             }
         }

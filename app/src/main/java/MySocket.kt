@@ -16,6 +16,7 @@ abstract class MySocket(private val mainActivity: MainActivity, private val port
     protected lateinit var mOutputStream: OutputStream
     protected lateinit var mInputStream: InputStream
     protected var isOpen = true
+    protected var isInputOpen = true
     private val executor: ExecutorService = Executors.newSingleThreadExecutor()
 
     init {
@@ -42,7 +43,9 @@ abstract class MySocket(private val mainActivity: MainActivity, private val port
     }
 
     fun close() {
-        mInputStream.close()
+        executor.execute {
+            isInputOpen = false
+        }
         isOpen=false
     }
 
@@ -79,6 +82,8 @@ class MyClientThread(mainActivity: MainActivity, private val inetAddress: String
                 }
             }
 
+            while (!isInputOpen) Thread.sleep(1)
+
             socket.close()
             for (x in myOnCloseListeners) x()
         }
@@ -107,6 +112,8 @@ class MyServerThread(mainActivity: MainActivity, port:Int): MySocket(mainActivit
                     isOpen = false
                 }
             }
+
+            while (!isInputOpen) Thread.sleep(1)
 
             socket.close()
             serverSocket.close()

@@ -1,11 +1,14 @@
 package com.ollivolland.lemaitre2
 
+import HostData
 import android.Manifest
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.content.pm.PackageManager
+import android.location.LocationManager
+import android.net.wifi.WifiManager
 import android.net.wifi.WpsInfo
 import android.net.wifi.p2p.WifiP2pConfig
 import android.net.wifi.p2p.WifiP2pDevice
@@ -15,6 +18,7 @@ import android.net.wifi.p2p.nsd.WifiP2pDnsSdServiceInfo
 import android.net.wifi.p2p.nsd.WifiP2pDnsSdServiceRequest
 import android.os.Build
 import android.os.Bundle
+import android.provider.Settings
 import android.view.View
 import android.widget.Button
 import android.widget.TextView
@@ -25,6 +29,8 @@ import kotlin.concurrent.thread
 
 class MainActivity : AppCompatActivity() {
     private val manager: WifiP2pManager by lazy { getSystemService(Context.WIFI_P2P_SERVICE) as WifiP2pManager }
+    private val wifiManager: WifiManager by lazy { applicationContext.getSystemService(Context.WIFI_SERVICE) as WifiManager }
+    private val locationManager: LocationManager by lazy { getSystemService(Context.LOCATION_SERVICE) as LocationManager }
     var channel: WifiP2pManager.Channel? = null
     private var receiver: MyWiFiDirectBroadcastReceiver? = null
     lateinit var mConnectionInfoListener: WifiP2pManager.ConnectionInfoListener
@@ -36,7 +42,9 @@ class MainActivity : AppCompatActivity() {
     private lateinit var mySocketFormation: MySocket
     var checkNeedAnotherSocket:() -> Unit ={}
 
-    //  todo    encapsulate
+    //  todo    cut raw mp3s
+    //  todo    video
+    //  todo    dialog config device, config global
 
     private var isRunning = true
     private var isConnected = false
@@ -44,10 +52,6 @@ class MainActivity : AppCompatActivity() {
     var isFormationSocketReady = true
     private var isTriedConnecting = false
     var isWantUpdateFormationDevices = true
-
-    var hostState:HostState = HostState.NONE
-    lateinit var mySocketCommunication: MySocket
-    private val myOwnerSocketsCommunication = mutableListOf<MySocket>()
 
     private val logs = mutableListOf<String>()
     lateinit var vLogger:TextView
@@ -57,21 +61,24 @@ class MainActivity : AppCompatActivity() {
         setContentView(R.layout.activity_main)
 
         //  permissions
-        var permissions = mutableListOf(Manifest.permission.ACCESS_FINE_LOCATION)
+        val permissions = mutableListOf(
+            Manifest.permission.ACCESS_COARSE_LOCATION,
+            Manifest.permission.ACCESS_FINE_LOCATION,
+            Manifest.permission.CAMERA,
+            Manifest.permission.RECORD_AUDIO)
         if (Build.VERSION.SDK_INT >= 33) permissions.add(Manifest.permission.NEARBY_WIFI_DEVICES)
-        permissions = permissions.filter { this.checkSelfPermission(it) != PackageManager.PERMISSION_GRANTED }.toMutableList()
+        val toGrant = permissions.filter { s -> checkSelfPermission(s) != PackageManager.PERMISSION_GRANTED }.toTypedArray()
 
-        if (permissions.isNotEmpty()) this.requestPermissions(permissions.toTypedArray(), 0)
+        if (toGrant.isNotEmpty()) requestPermissions(toGrant, 1)
 
         //  ui
         val vHost = findViewById<Button>(R.id.buttonHost)
         val vClient = findViewById<Button>(R.id.buttonClient)
         val vFin = findViewById<Button>(R.id.buttonFin)
-        val vPing = findViewById<Button>(R.id.buttonPing)
         vLogger = findViewById(R.id.logger)
 
         vHost.setOnClickListener {
-            hostState=HostState.HOST
+            Session.state= SessionState.HOST
             startRegistration()
 
             vClient.visibility = View.GONE
@@ -81,7 +88,7 @@ class MainActivity : AppCompatActivity() {
         }
 
         vClient.setOnClickListener {
-            hostState=HostState.CLIENT
+            Session.state= SessionState.CLIENT
             discover()
 
             vHost.visibility = View.GONE
@@ -93,20 +100,13 @@ class MainActivity : AppCompatActivity() {
         vFin.setOnClickListener {
             vClient.visibility = View.GONE
             vHost.visibility = View.GONE
-            vPing.visibility = View.VISIBLE
 
             vFin.isEnabled=false
-            for (i in clients.indices) {
-                myOwnerSocketsCommunication.add(MyClientThread(this, clients[i].ipWifiP2p, clients[i].port).apply {
-                    setOnRead { s -> toast(s) }
-                })
-            }
+            HostData.set(clients)
             log("finished with ${clients.size} clients")
-        }
 
-        vPing.setOnClickListener {
-            for (x in myOwnerSocketsCommunication) x.write("ping")
-            if(this::mySocketCommunication.isInitialized) mySocketCommunication.write("ping")
+            startActivity(Intent(this, ActivityHome::class.java))
+            finish()
         }
 
         //  setup
@@ -114,7 +114,18 @@ class MainActivity : AppCompatActivity() {
         channel = manager.initialize(this, mainLooper, null)
         receiver = MyWiFiDirectBroadcastReceiver(manager, channel!!, this)
 
-        //  todo    require WIFI & Location
+        //  enable wifi
+        if(!wifiManager.isWifiEnabled) {
+            Toast.makeText(this, "WIFI is off", Toast.LENGTH_SHORT).show()
+
+            if (Build.VERSION.SDK_INT <= 28) wifiManager.isWifiEnabled = true
+            else startActivityForResult(Intent(Settings.Panel.ACTION_WIFI), 1)
+        }
+
+        //  enable location
+        if(!locationManager.isProviderEnabled(LocationManager.GPS_PROVIDER)) {
+            startActivityForResult(Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS), 1)
+        }
 
         //  reset all wifiP2p connections, groups and services
         manager.stopPeerDiscovery(channel, MyWifiP2pActionListener("stopPeerDiscovery").setOnComplete {
@@ -131,9 +142,9 @@ class MainActivity : AppCompatActivity() {
         })
 
         checkNeedAnotherSocket = {
-            if (hostState == HostState.HOST && isFormationSocketReady && clients.count() < formationDevices.count()) {
+            if (Session.state ==  SessionState.HOST && isFormationSocketReady && clients.count() < formationDevices.count()) {
                 isFormationSocketReady=false
-                mySocketFormation = MyServerThread(this, PORT_FORMATION).apply {
+                mySocketFormation = MyServerThread(PORT_FORMATION).apply {
                     addOnConfigured {
                         val client = Client(it.inetAddress.hostAddress!!, PORT_COMMUNICATION + clients.count())
                         clients.add(client)
@@ -144,7 +155,7 @@ class MainActivity : AppCompatActivity() {
                         }
                         this.write(jo.toString())
                     }
-                    setOnRead { s ->
+                    addOnRead { s ->
                         toast(s)
 
                         if (s == "close") this.close()
@@ -153,6 +164,7 @@ class MainActivity : AppCompatActivity() {
                         isFormationSocketReady=true
                         checkNeedAnotherSocket()
                     }
+                    log(this@MainActivity)
                 }
             }
         }
@@ -171,9 +183,9 @@ class MainActivity : AppCompatActivity() {
 
             //  sockets
             checkNeedAnotherSocket()
-            if(hostState == HostState.CLIENT && !this::mySocketFormation.isInitialized) {
-                mySocketFormation = MyClientThread(this, info.groupOwnerAddress.hostAddress!!, PORT_FORMATION).apply {
-                    setOnRead { s ->
+            if(Session.state ==  SessionState.CLIENT && !this::mySocketFormation.isInitialized) {
+                mySocketFormation = MyClientThread(info.groupOwnerAddress.hostAddress!!, PORT_FORMATION).apply {
+                    addOnRead { s ->
                         toast(s)
 
                         val jo = JSONObject(s)
@@ -185,17 +197,36 @@ class MainActivity : AppCompatActivity() {
                             this.write("close")
                             this.close()
 
-                            mySocketCommunication = MyServerThread(this@MainActivity, host.port).apply {
-                                setOnRead { s -> toast(s) }
+                            var finReader:(String) -> Unit = {}
+                            finReader = { s2 ->
+                                if(s2 == "fin") {
+                                    Session.mySocketCommunication?.removeOnRead(finReader)
+                                    startActivity(Intent(this@MainActivity, ActivityHome::class.java))
+                                    finish()
+                                }
+                            }
+                            Session.mySocketCommunication = MyServerThread(host.port).apply {
+                                addOnRead(finReader)
+                                log(this@MainActivity)
                             }
                         }
                     }
+                    log(this@MainActivity)
                 }
             }
 
             isConnected = info.groupFormed
         }
         manager.requestConnectionInfo(channel, mConnectionInfoListener)
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        isRunning = false
+
+        manager.clearLocalServices(channel, MyWifiP2pActionListener("clearLocalServices"))
+        manager.clearServiceRequests(channel, MyWifiP2pActionListener("clearServiceRequests"))
+        manager.stopPeerDiscovery(channel, MyWifiP2pActionListener("stopPeerDiscovery"))
     }
 
     override fun onResume() {
@@ -208,9 +239,26 @@ class MainActivity : AppCompatActivity() {
         receiver?.unregister()
     }
 
-    override fun onDestroy() {
-        super.onDestroy()
-        isRunning=false
+    private fun buildAlertMessageNoGps() {
+        startActivityForResult(Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS), 1)
+
+//        val locationRequest = LocationRequest.create().setPriority(LocationRequest.PRIORITY_HIGH_ACCURACY).setInterval(100).setFastestInterval(100)
+//        val builder = LocationSettingsRequest.Builder().addLocationRequest(locationRequest).setAlwaysShow(true)
+//        val client: SettingsClient = LocationServices.getSettingsClient(this)
+//
+//        client.checkLocationSettings(builder.build())
+//            .addOnSuccessListener {
+//                Toast.makeText(this, "Gps is enabled", Toast.LENGTH_LONG).show()
+//            }
+//            .addOnFailureListener { exception ->
+//                if (exception is ResolvableApiException) {
+//                    try {
+//                        exception.startResolutionForResult(this, 1000)
+//                    } catch (sendEx: SendIntentException) {
+//                        startActivity(Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS))
+//                    }
+//                } else startActivity(Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS))
+//            }
     }
 
     private fun discover() {
@@ -243,34 +291,6 @@ class MainActivity : AppCompatActivity() {
                 }
             }
         })
-
-//        val nsdManager = getSystemService(Context.NSD_SERVICE) as NsdManager
-//        nsdManager.discoverServices(SERVICE_TYPE, NsdManager.PROTOCOL_DNS_SD, object :DiscoveryListener{
-//            override fun onStartDiscoveryFailed(p0: String?, p1: Int) {
-//                log("onStartDiscoveryFailed")
-//            }
-//
-//            override fun onStopDiscoveryFailed(p0: String?, p1: Int) {
-//                log("onStopDiscoveryFailed")
-//            }
-//
-//            override fun onDiscoveryStarted(p0: String?) {
-//                log("onDiscoveryStarted")
-//            }
-//
-//            override fun onDiscoveryStopped(p0: String?) {
-//                log("onDiscoveryStopped")
-//            }
-//
-//            override fun onServiceFound(p0: NsdServiceInfo?) {
-//                log("onServiceFound $p0")
-//            }
-//
-//            override fun onServiceLost(p0: NsdServiceInfo?) {
-//                log("onServiceLost")
-//            }
-//
-//        })
     }
 
     private fun startRegistration() {
@@ -287,34 +307,14 @@ class MainActivity : AppCompatActivity() {
         //  create service
         manager.createGroup(channel, MyWifiP2pActionListener("createGroup").setOnSuccess {
             manager.addLocalService(channel, serviceInfo1, MyWifiP2pActionListener("addLocalService").setOnSuccess {
-                manager.discoverPeers(channel, MyWifiP2pActionListener("discoverPeers"))
+                thread {
+                     while (isRunning) {
+                         manager.discoverPeers(channel, MyWifiP2pActionListener("discoverPeers"))
+                         Thread.sleep(3000)
+                    }
+                }
             })
         })
-
-//        val servInfo = NsdServiceInfo().apply {
-//            serviceName = SERVICE_NAME
-//            serviceType = "_presence._tcp"
-//            port = 8877
-//        }
-//        val nsdManager = getSystemService(Context.NSD_SERVICE) as NsdManager
-//        nsdManager.registerService(servInfo, NsdManager.PROTOCOL_DNS_SD, object :RegistrationListener{
-//            override fun onRegistrationFailed(p0: NsdServiceInfo?, p1: Int) {
-//                log("Not yet implemented")
-//            }
-//
-//            override fun onUnregistrationFailed(p0: NsdServiceInfo?, p1: Int) {
-//                log("Not yet implemented")
-//            }
-//
-//            override fun onServiceRegistered(p0: NsdServiceInfo?) {
-//                log("onServiceRegistered")
-//            }
-//
-//            override fun onServiceUnregistered(p0: NsdServiceInfo?) {
-//                log("Not yet implemented")
-//            }
-//
-//        })
     }
 
     fun toast(s:String) = runOnUiThread { Toast.makeText(this, s, Toast.LENGTH_LONG).show() }
@@ -323,11 +323,9 @@ class MainActivity : AppCompatActivity() {
         println(string)
         logs.add(string)
         runOnUiThread {
-            vLogger.text = logs.takeLast(20).joinToString("\n")
+            vLogger.text = logs.takeLast(20).reversed().joinToString("\n")
         }
     }
-
-    enum class HostState { NONE, HOST, CLIENT }
 
     companion object {
         const val PORT_FORMATION = 8888
@@ -373,7 +371,7 @@ class MyWiFiDirectBroadcastReceiver(
                                 activity.formationDevices.add(it)
                                 activity.log("formation found ${it.deviceName}")
 
-                                if(activity.hostState == MainActivity.HostState.HOST) {
+                                if(Session.state ==  SessionState.HOST) {
                                     val config = WifiP2pConfig().apply {
                                         deviceAddress = it.deviceAddress
                                         wps.setup = WpsInfo.PBC

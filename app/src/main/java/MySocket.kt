@@ -9,17 +9,17 @@ import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 import kotlin.concurrent.thread
 
-abstract class MySocket(private val mainActivity: MainActivity, private val port: Int, private val type:String) {
+abstract class MySocket(private val port: Int, private val type:String) {
+    private val executor: ExecutorService = Executors.newSingleThreadExecutor()
     protected val myOnSocketListener = mutableListOf<(Socket) -> Unit>()
     protected val myOnCloseListeners = mutableListOf<() -> Unit>()
-    protected var myOnReadListener:(ByteArray, Int) -> Unit = { _, _->}
+    protected val myOnReadListeners = mutableListOf<(String) -> Unit>()
     protected lateinit var mOutputStream: OutputStream
     protected lateinit var mInputStream: InputStream
     protected var isOpen = true
     protected var isInputOpen = true
-    private val executor: ExecutorService = Executors.newSingleThreadExecutor()
 
-    init {
+    fun log(mainActivity: MainActivity) {
         mainActivity.log("[$port] $type creating")
         myOnSocketListener.add { socket -> mainActivity.log("[$port] $type created ${socket.localAddress.hostAddress} => ${socket.inetAddress.hostAddress}") }
         myOnCloseListeners.add { mainActivity.log("[$port] $type closed") }
@@ -29,7 +29,7 @@ abstract class MySocket(private val mainActivity: MainActivity, private val port
     fun write(byteArray: ByteArray) {
         if(!isOpen) return
         if(!this::mOutputStream.isInitialized) {
-            write(byteArray)
+            myOnSocketListener.add { write(byteArray) }
             return
         }
 
@@ -41,26 +41,23 @@ abstract class MySocket(private val mainActivity: MainActivity, private val port
             }
         }
     }
+    fun writeTime(f:()->Long) {
+        executor.execute { mOutputStream.write("time=${f()}".encodeToByteArray()) }
+    }
 
     fun close() {
-        executor.execute {
-            isInputOpen = false
-        }
+        executor.execute { isInputOpen = false }
         isOpen=false
     }
 
     fun addOnConfigured(action:(Socket) -> Unit) = myOnSocketListener.add(action)
     fun addOnClose(action:() -> Unit) = myOnCloseListeners.add(action)
 
-    fun setOnRead(action:(ByteArray, Int) -> Unit) {
-        myOnReadListener = action
-    }
-    fun setOnRead(action:(String) -> Unit) {
-        myOnReadListener = { buffer, len->action(String(buffer,0,len)) }
-    }
+    fun addOnRead(action:(String) -> Unit) = myOnReadListeners.add(action)
+    fun removeOnRead(action:(String) -> Unit) = myOnReadListeners.remove(action)
 }
 
-class MyClientThread(mainActivity: MainActivity, private val inetAddress: String, port: Int): MySocket(mainActivity, port, "client") {
+class MyClientThread(private val inetAddress: String, port: Int): MySocket(port, "client") {
     private val socket: Socket = Socket()
 
     init {
@@ -75,7 +72,12 @@ class MyClientThread(mainActivity: MainActivity, private val inetAddress: String
             while(isOpen) {
                 try {
                     length = mInputStream.read(buffer)
-                    if (length > 0) myOnReadListener(buffer, length)
+
+                    if (length > 0) {
+                        val s = String(buffer, 0, length)
+
+                        for (x in myOnReadListeners) x(s)
+                    }
                 } catch (e:Exception) {
                     e.printStackTrace()
                     isOpen = false
@@ -90,7 +92,7 @@ class MyClientThread(mainActivity: MainActivity, private val inetAddress: String
     }
 }
 
-class MyServerThread(mainActivity: MainActivity, port:Int): MySocket(mainActivity, port, "server") {
+class MyServerThread(port:Int): MySocket(port, "server") {
     private var serverSocket: ServerSocket = ServerSocket(port)
     lateinit var socket: Socket
 
@@ -106,7 +108,12 @@ class MyServerThread(mainActivity: MainActivity, port:Int): MySocket(mainActivit
             while(isOpen) {
                 try {
                     length = mInputStream.read(buffer)
-                    if (length > 0) myOnReadListener(buffer, length)
+
+                    if (length > 0) {
+                        val s = String(buffer, 0, length)
+
+                        for (x in myOnReadListeners) x(s)
+                    }
                 } catch (e:Exception) {
                     e.printStackTrace()
                     isOpen = false

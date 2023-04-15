@@ -1,4 +1,7 @@
+import com.ollivolland.lemaitre2.Session
+
 data class StartData(val id:Long, val timeStamp:Long, val commandLength: Long, val videoLength: Long, val mpStarts:Array<Long>) {
+    val config: ConfigData = Session.currentConfig.copy()
     var isLaunched = false
 
     override fun toString(): String {

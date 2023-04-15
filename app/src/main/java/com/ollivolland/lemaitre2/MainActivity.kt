@@ -1,5 +1,6 @@
 package com.ollivolland.lemaitre2
 
+import ClientData
 import HostData
 import android.Manifest
 import android.content.BroadcastReceiver
@@ -28,6 +29,7 @@ import org.json.JSONObject
 import kotlin.concurrent.thread
 
 class MainActivity : AppCompatActivity() {
+    var thisDeviceName: String = ""
     private val manager: WifiP2pManager by lazy { getSystemService(Context.WIFI_P2P_SERVICE) as WifiP2pManager }
     private val wifiManager: WifiManager by lazy { applicationContext.getSystemService(Context.WIFI_SERVICE) as WifiManager }
     private val locationManager: LocationManager by lazy { getSystemService(Context.LOCATION_SERVICE) as LocationManager }
@@ -37,14 +39,17 @@ class MainActivity : AppCompatActivity() {
 
     val formationDevices = mutableListOf<WifiP2pDevice>()
     private val clients = mutableListOf<Client>()
-    private lateinit var host: Host
     private lateinit var hostMac:String
     private lateinit var mySocketFormation: MySocket
     var checkNeedAnotherSocket:() -> Unit ={}
 
+    //  todo    config communication
+    //  todo    start communication
+
     //  todo    cut raw mp3s
     //  todo    video
-    //  todo    dialog config device, config global
+    //  todo    video timestamp
+    //  todo    persistent socket
 
     private var isRunning = true
     private var isConnected = false
@@ -102,7 +107,7 @@ class MainActivity : AppCompatActivity() {
             vHost.visibility = View.GONE
 
             vFin.isEnabled=false
-            HostData.set(clients)
+            HostData.set(thisDeviceName, clients)
             log("finished with ${clients.size} clients")
 
             startActivity(Intent(this, ActivityHome::class.java))
@@ -144,21 +149,27 @@ class MainActivity : AppCompatActivity() {
         checkNeedAnotherSocket = {
             if (Session.state ==  SessionState.HOST && isFormationSocketReady && clients.count() < formationDevices.count()) {
                 isFormationSocketReady=false
+                val port = PORT_COMMUNICATION + clients.count()
+                var ip = ""
                 mySocketFormation = MyServerThread(PORT_FORMATION).apply {
                     addOnConfigured {
-                        val client = Client(it.inetAddress.hostAddress!!, PORT_COMMUNICATION + clients.count())
-                        clients.add(client)
-                        log("client $client")
+                        ip = it.inetAddress.hostAddress!!
 
-                        val jo = JSONObject().apply {
-                            accumulate("useport", client.port)
-                        }
-                        this.write(jo.toString())
+                        this.write(JSONObject().apply {
+                            accumulate("useport", port)
+                        }.toString())
                     }
                     addOnRead { s ->
                         toast(s)
+                        val jo = JSONObject(s)
 
-                        if (s == "close") this.close()
+                        if (jo.has("name")) {
+                            val client = Client(ip, port, jo["name"] as String)
+                            clients.add(client)
+                            log("client $client")
+
+                            this.close()
+                        }
                     }
                     addOnClose {
                         isFormationSocketReady=true
@@ -187,28 +198,16 @@ class MainActivity : AppCompatActivity() {
                 mySocketFormation = MyClientThread(info.groupOwnerAddress.hostAddress!!, PORT_FORMATION).apply {
                     addOnRead { s ->
                         toast(s)
-
                         val jo = JSONObject(s)
 
                         if(jo.has("useport")) {
-                            host = Host(hostMac, jo["useport"] as Int)
-                            log("host = $host")
-
-                            this.write("close")
+                            this.write(JSONObject().apply {
+                                accumulate("name", thisDeviceName)
+                            }.toString())
                             this.close()
 
-                            var finReader:(String) -> Unit = {}
-                            finReader = { s2 ->
-                                if(s2 == "fin") {
-                                    Session.mySocketCommunication?.removeOnRead(finReader)
-                                    startActivity(Intent(this@MainActivity, ActivityHome::class.java))
-                                    finish()
-                                }
-                            }
-                            Session.mySocketCommunication = MyServerThread(host.port).apply {
-                                addOnRead(finReader)
-                                log(this@MainActivity)
-                            }
+                            ClientData.set(jo["useport"] as Int, hostMac, this@MainActivity)
+                            log("host = ${ClientData.get!!.port}")
                         }
                     }
                     log(this@MainActivity)
@@ -339,12 +338,8 @@ class MainActivity : AppCompatActivity() {
 
 data class Client(
     val ipWifiP2p:String,
-    val port:Int
-)
-
-data class Host(
-    val mac:String,
-    val port:Int
+    val port:Int,
+    val name:String,
 )
 
 class MyWiFiDirectBroadcastReceiver(
@@ -354,6 +349,15 @@ class MyWiFiDirectBroadcastReceiver(
 ) : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         when (intent.action!!) {
+            WifiP2pManager.WIFI_P2P_THIS_DEVICE_CHANGED_ACTION -> {
+                println("WIFI_P2P_THIS_DEVICE_CHANGED_ACTION")
+
+                val device = intent.getParcelableExtra(WifiP2pManager.EXTRA_WIFI_P2P_DEVICE) as WifiP2pDevice?
+                if(device != null && activity.thisDeviceName.isEmpty()) {
+                    activity.thisDeviceName = device.deviceName
+                    activity.log("deviceName = ${activity.thisDeviceName}")
+                }
+            }
             WifiP2pManager.WIFI_P2P_CONNECTION_CHANGED_ACTION -> {
                 println("WIFI_P2P_CONNECTION_CHANGED_ACTION")
 
@@ -398,6 +402,7 @@ class MyWiFiDirectBroadcastReceiver(
         private val INTENT_FILTER = IntentFilter().apply {
             addAction(WifiP2pManager.WIFI_P2P_PEERS_CHANGED_ACTION)
             addAction(WifiP2pManager.WIFI_P2P_CONNECTION_CHANGED_ACTION)
+            addAction(WifiP2pManager.WIFI_P2P_THIS_DEVICE_CHANGED_ACTION)
         }
     }
 }

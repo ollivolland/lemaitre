@@ -7,6 +7,7 @@ import android.content.Intent
 import android.media.MediaPlayer
 import android.os.Bundle
 import android.view.TextureView
+import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
 import com.ollivolland.lemaitre.camera.MyCamera2
 import com.ollivolland.lemaitre.camera.MyRequestPreview
@@ -14,7 +15,7 @@ import kotlin.concurrent.thread
 
 class ActivityStart : AppCompatActivity() {
     lateinit var timer:MyTimer
-    lateinit var data: StartData
+    lateinit var start: StartData
     lateinit var mycamera2: MyCamera2
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -22,32 +23,39 @@ class ActivityStart : AppCompatActivity() {
         setContentView(R.layout.activity_start)
 
         timer = MyTimer()
-        data = startData!!
+        start = startData!!
 
+        //  ui
         val vTexture = findViewById<TextureView>(R.id.start_vTexture)
+        val vLog = findViewById<TextView>(R.id.start_tLog)
+
+        vLog.text = "$start\n\n${start.config}"
 
         //  camera
-        val requestPreview = MyRequestPreview(vTexture)
-        mycamera2 = MyCamera2(this)
-            .addRequest(requestPreview)
-            .open()
-        requestPreview.start()
+        if(start.config.isCamera) {
+            val requestPreview = MyRequestPreview(vTexture)
+            mycamera2 = MyCamera2(this)
+                .addRequest(requestPreview)
+                .open()
+            requestPreview.start()
+        }
 
         //  mps
-        val ids = arrayOf(R.raw.aufdieplaetze, R.raw.fertig, R.raw.gunshot_10db_1s_delayed)
-        val mps = Array<MediaPlayer>(ids.size) { i -> MediaPlayer.create(this, ids[i]) }
-        for (x in mps)
-            x.setOnCompletionListener { x.release() }
+        if(start.config.isCommand) {
+            val ids = arrayOf(R.raw.aufdieplaetze, R.raw.fertig, R.raw.gunshot_10db_1s_delayed)
+            val mps = Array<MediaPlayer>(ids.size) { i -> MediaPlayer.create(this, ids[i]) }
+            for (x in mps) x.setOnCompletionListener { x.release() }
 
-        thread {
-            for (i in mps.indices) {
-                timer.lock(data.mpStarts[i])
-                mps[i].start()
+            thread {
+                for (i in mps.indices) {
+                    timer.lock(start.mpStarts[i])
+                    mps[i].start()
+                }
             }
         }
 
         thread {
-            timer.lock(data.timeStamp + data.commandLength + data.videoLength + DURATION_WAIT_AFTER_FINISH)
+            timer.lock(start.timeStamp + start.commandLength + start.videoLength + DURATION_WAIT_AFTER_FINISH)
             finish()
         }
     }
@@ -55,7 +63,7 @@ class ActivityStart : AppCompatActivity() {
     override fun onDestroy() {
         super.onDestroy()
         isBusy = false
-        mycamera2.close()
+        if(this::mycamera2.isInitialized) mycamera2.close()
     }
 
     companion object {
@@ -69,6 +77,7 @@ class ActivityStart : AppCompatActivity() {
 
             isBusy = true
             this.startData = startData
+
             startData.isLaunched = true
             context.startActivity(Intent(context, ActivityStart::class.java))
         }

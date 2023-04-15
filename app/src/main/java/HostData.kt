@@ -1,15 +1,22 @@
-import android.view.LayoutInflater
-import android.view.ViewGroup
-import android.widget.Button
+import android.app.Dialog
+import android.content.Context
 import android.widget.Spinner
-import com.ollivolland.lemaitre2.*
+import android.widget.TextView
+import com.ollivolland.lemaitre2.Client
+import com.ollivolland.lemaitre2.MyClientThread
+import com.ollivolland.lemaitre2.MySocket
+import com.ollivolland.lemaitre2.R
 
-class HostData private constructor(clients: MutableList<Client>) {
-    val mySockets:Array<MySocket>
+class HostData private constructor(val hostName:String, val clients: Array<Client>) {
+    val mySockets:Array<MySocket> = Array(clients.size) { i -> MyClientThread(clients[i].ipWifiP2p, clients[i].port) }
     var command:String = COMMAND_CHOICES[0]
     var flavor:Long = FLAVOR_CHOICES[0]
     var delta:Long = DELTA_CHOICES[0]
     var videoLength:Long = DURATION_CHOICES[0]
+
+    init {
+        for (x in mySockets) x.write("fin")
+    }
 
     companion object {
         val COMMAND_CHOICES = arrayOf("kKurz", "kLang", "kMittel", "biep")
@@ -21,36 +28,30 @@ class HostData private constructor(clients: MutableList<Client>) {
         val DELTA_CHOICES = arrayOf(3_000L, 10_000L, 30_000L)
         val DELTA_DESCRIPTIONS = arrayOf("3s", "10s", "30s")
 
-        var get:HostData = HostData(mutableListOf()); private set
+        var get:HostData = HostData("", arrayOf()); private set
 
-        fun set(clients: MutableList<Client>){
-            get = HostData(clients)
+        fun set(hostName: String, clients: MutableList<Client>){
+            get = HostData(hostName, clients.toTypedArray())
         }
 
-        fun createRoot(viewGroup: ViewGroup) {
-            val root = LayoutInflater.from(viewGroup.context).inflate(R.layout.view_global, viewGroup)
+        fun createRoot(context:Context):Dialog {
+            val d = Dialog(context)
+            d.setContentView(R.layout.dialog_global)
 
-            val vSpinnerCommand = root.findViewById<Spinner>(R.id.home_sCommand)
-            val vSpinnerFlavor = root.findViewById<Spinner>(R.id.home_sFlavor)
-            val vSpinnerLength = root.findViewById<Spinner>(R.id.home_sVideoLength)
-            val vSpinnerDelta = root.findViewById<Spinner>(R.id.home_sDelta)
-            val vStart = root.findViewById<Button>(R.id.home_bStart)
-            val vSchedule = root.findViewById<Button>(R.id.home_bSchedule)
+            val vTitle = d.findViewById<TextView>(R.id.global_tTitle)
+            val vSpinnerCommand = d.findViewById<Spinner>(R.id.home_sCommand)
+            val vSpinnerFlavor = d.findViewById<Spinner>(R.id.home_sFlavor)
+            val vSpinnerLength = d.findViewById<Spinner>(R.id.home_sVideoLength)
+            val vSpinnerDelta = d.findViewById<Spinner>(R.id.home_sDelta)
 
+            vTitle.text = "Kommando"
             vSpinnerCommand.config(COMMAND_DESCRIPTIONS) { i -> get.command = COMMAND_CHOICES[i] }
             vSpinnerFlavor.config(FLAVOR_DESCRIPTIONS) { i -> get.flavor = FLAVOR_CHOICES[i] }
             vSpinnerLength.config(DURATION_DESCRIPTIONS) { i -> get.videoLength = DURATION_CHOICES[i] }
             vSpinnerDelta.config(DELTA_DESCRIPTIONS) { i -> get.delta = DELTA_CHOICES[i] }
 
-            vStart.setOnClickListener {
-                val start = StartData.create(MyTimer().time + get.delta, get.command, get.flavor, get.videoLength)
-                Session.starts.add(start)
-            }
+            d.show()
+            return d
         }
-    }
-
-    init {
-        mySockets = Array(clients.size) { i -> MyClientThread(clients[i].ipWifiP2p, clients[i].port) }
-        for (x in mySockets) x.write("fin")
     }
 }

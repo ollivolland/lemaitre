@@ -1,13 +1,14 @@
 package com.ollivolland.lemaitre2
 
-import ClientConfig
-import ConfigContainer
+import ConfigData
 import HostData
+import MyTimer
+import StartData
 import android.annotation.SuppressLint
-import android.app.Dialog
 import android.os.Bundle
 import android.os.SystemClock
 import android.view.View
+import android.widget.Button
 import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
@@ -29,20 +30,36 @@ class ActivityHome : AppCompatActivity() {
 
         if(Session.state == SessionState.HOST) {
             val data = HostData.get
-            val configMe = ClientConfig(false, false, false, ClientConfig.FPS_CHOICES[0])
+            val configMe = ConfigData(data.hostName)
+            val configClients = Array(data.clients.size) { i -> ConfigData(data.clients[i].name) }
+
             vConfig.visibility = View.VISIBLE
 
-            val x = ConfigContainer(vConfig)
-            HostData.createRoot(x.layout)
+            val vStart = findViewById<Button>(R.id.home_bStart)
+            val vSchedule = findViewById<Button>(R.id.home_bSchedule)
 
-            val y = ConfigContainer(vConfig)
-            configMe.createRoot(y.layout)
+            vStart.setOnClickListener {
+                val start = StartData.create(MyTimer().time + data.delta, data.command, data.flavor, data.videoLength)
+                Session.starts.add(start)
+            }
 
-//            val ll = LinearLayout(this)
-//            configMe.createRoot(ll)
-            val d = Dialog(this)
-            d.setContentView(R.layout.view_client)
-            d.show()
+            var iClient = 0
+            var dialogClient:()->Unit={}
+            dialogClient = {
+                if(iClient < configClients.size) {
+                    configClients[iClient].createRoot(this).setOnCancelListener {
+                        iClient++
+                        dialogClient()
+                    }
+                }
+            }
+            HostData.createRoot(this).setOnCancelListener {
+                Session.currentConfig = configMe
+
+                configMe.createRoot(this).setOnCancelListener {
+                    dialogClient()
+                }
+            }
         }
 
         GpsTime.register(this)

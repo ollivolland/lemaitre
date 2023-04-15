@@ -19,10 +19,10 @@ abstract class MySocket(private val port: Int, private val type:String) {
     protected var isOpen = true
     protected var isInputOpen = true
 
-    fun log(mainActivity: MainActivity) {
-        mainActivity.log("[$port] $type creating")
-        myOnSocketListener.add { socket -> mainActivity.log("[$port] $type created ${socket.localAddress.hostAddress} => ${socket.inetAddress.hostAddress}") }
-        myOnCloseListeners.add { mainActivity.log("[$port] $type closed") }
+    fun log(f:(String)->Unit) {
+        f("[$port] $type creating")
+        myOnSocketListener.add { socket -> f("[$port] $type created ${socket.localAddress.hostAddress} => ${socket.inetAddress.hostAddress}") }
+        myOnCloseListeners.add { f("[$port] $type closed") }
     }
 
     fun write(s:String) = write(s.encodeToByteArray())
@@ -41,6 +41,7 @@ abstract class MySocket(private val port: Int, private val type:String) {
             }
         }
     }
+
     fun writeTime(f:()->Long) {
         executor.execute { mOutputStream.write("time=${f()}".encodeToByteArray()) }
     }

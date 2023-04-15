@@ -43,7 +43,9 @@ class MainActivity : AppCompatActivity() {
     private lateinit var mySocketFormation: MySocket
     var checkNeedAnotherSocket:() -> Unit ={}
 
-    //  todo    indicate clients in main
+    //  todo    dialog spinner info
+    //  todo    persistent wifip2p
+    //  todo    wakelock
     //  todo    change global config
     //  todo    video
     //  todo    video timestamp
@@ -63,6 +65,7 @@ class MainActivity : AppCompatActivity() {
 
     private val logs = mutableListOf<String>()
     lateinit var vLogger:TextView
+    lateinit var vFeedback:TextView
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -82,6 +85,7 @@ class MainActivity : AppCompatActivity() {
         val vHost = findViewById<Button>(R.id.buttonHost)
         val vClient = findViewById<Button>(R.id.buttonClient)
         vLogger = findViewById(R.id.logger)
+        vFeedback = findViewById(R.id.main_tFeedback)
 
         vHost.setOnClickListener {
             Session.state= SessionState.HOST
@@ -165,7 +169,7 @@ class MainActivity : AppCompatActivity() {
                         if (jo.has("name")) {
                             val client = Client(ip, port, jo["name"] as String)
                             clients.add(client)
-                            log("client $client")
+                            log("client ${client.name} on [$port] => $ip")
 
                             this.close()
                         }
@@ -174,7 +178,7 @@ class MainActivity : AppCompatActivity() {
                         isFormationSocketReady=true
                         checkNeedAnotherSocket()
                     }
-                    log(this@MainActivity)
+                    log{ s -> this@MainActivity.log(s) }
                 }
             }
         }
@@ -182,7 +186,7 @@ class MainActivity : AppCompatActivity() {
         mConnectionInfoListener = WifiP2pManager.ConnectionInfoListener { info ->
             if(!isWantConnection) return@ConnectionInfoListener
 
-            log("connection: formed = ${info.groupFormed}, isOwner = ${info.isGroupOwner}")
+            println("connection: formed = ${info.groupFormed}, isOwner = ${info.isGroupOwner}")
 
             if(!isConnected && info.groupFormed) log("CONNECTED (${info.groupOwnerAddress.hostAddress})")
             if(isConnected && !info.groupFormed) log("DISCONNECTED")
@@ -209,13 +213,31 @@ class MainActivity : AppCompatActivity() {
                             log("host = ${ClientData.get!!.port}")
                         }
                     }
-                    log(this@MainActivity)
+                    log{ s -> this@MainActivity.log(s) }
                 }
             }
 
             isConnected = info.groupFormed
         }
         manager.requestConnectionInfo(channel, mConnectionInfoListener)
+
+        //  UIThread
+        thread {
+            while (isRunning) {
+                runOnUiThread {
+                    vFeedback.text = when (Session.state) {
+                        SessionState.HOST -> {
+                            if(clients.size == 0) "no clients"
+                            else clients.joinToString("\n") { it.name }
+                        }
+                        SessionState.CLIENT -> "waiting for host"
+                        else -> "choose"
+                    }
+                }
+
+                Thread.sleep(20)
+            }
+        }
     }
 
     override fun onDestroy() {
@@ -292,19 +314,14 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun startRegistration() {
-        val txtMap: Map<String, String> = mapOf(
-            "listenport" to "8887",
-            "buddyname" to "Gaijinhunter${(Math.random() * 1000).toInt()}",
-            "available" to "visible",
-        )
-        log("DNS added $txtMap")
-
         //  Pass it an instance name, service type (_protocol._transportlayer) , and the map containing information other devices will want once they connect to this one.
-        val serviceInfo1 = WifiP2pDnsSdServiceInfo.newInstance(SERVICE_NAME, SERVICE_TYPE, txtMap)
+        val serviceInfo1 = WifiP2pDnsSdServiceInfo.newInstance(SERVICE_NAME, SERVICE_TYPE, mapOf())
 
         //  create service
         manager.createGroup(channel, MyWifiP2pActionListener("createGroup").setOnSuccess {
             manager.addLocalService(channel, serviceInfo1, MyWifiP2pActionListener("addLocalService").setOnSuccess {
+                log("DNS added")
+
                 thread {
                      while (isRunning) {
                          manager.discoverPeers(channel, MyWifiP2pActionListener("discoverPeers"))
@@ -372,7 +389,7 @@ class MyWiFiDirectBroadcastReceiver(
                         list.deviceList.forEach {
                             if (!activity.formationDevices.contains(it)) {
                                 activity.formationDevices.add(it)
-                                activity.log("formation found ${it.deviceName}")
+                                activity.log("found ${it.deviceName}")
 
                                 if(Session.state ==  SessionState.HOST) {
                                     val config = WifiP2pConfig().apply {

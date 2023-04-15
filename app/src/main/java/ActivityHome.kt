@@ -1,5 +1,6 @@
 package com.ollivolland.lemaitre2
 
+import Globals
 import MyTimer
 import android.annotation.SuppressLint
 import android.os.Bundle
@@ -13,10 +14,12 @@ import datas.ClientData
 import datas.ConfigData
 import datas.HostData
 import datas.StartData
+import java.util.*
 import kotlin.concurrent.thread
 
 class ActivityHome : AppCompatActivity() {
     lateinit var vLogger: TextView
+    lateinit var vFeedback: TextView
     private val logs:MutableList<String> = mutableListOf()
     var isRunning = true
     var sentLastUpdate = 0L
@@ -27,6 +30,7 @@ class ActivityHome : AppCompatActivity() {
         setContentView(R.layout.activity_home)
 
         vLogger = findViewById(R.id.home_tLogger)
+        vFeedback = findViewById(R.id.home_tFeedback)
         val vBlinker = findViewById<View>(R.id.home_vBlinker)
         val vConfig = findViewById<LinearLayout>(R.id.home_lConfig)
         val vButtons = findViewById<LinearLayout>(R.id.home_lButtons)
@@ -112,8 +116,7 @@ class ActivityHome : AppCompatActivity() {
 
         GpsTime.register(this)
 
-        log("launch")
-
+        //  blinker
         thread {
             while (isRunning) {
                 val should = if(getTime() % 1000 < 200) View.VISIBLE else View.INVISIBLE
@@ -126,6 +129,7 @@ class ActivityHome : AppCompatActivity() {
         //  check for starts
         thread {
             while (isRunning) {
+                //  start starts
                 if(!ActivityStart.isBusy)
                     for (x in Session.starts)
                         if(!x.isLaunched && x.timeStamp < getTime() + TIME_START)
@@ -134,10 +138,20 @@ class ActivityHome : AppCompatActivity() {
                             log("do start = $x")
                         }
 
+                //  client update host
                 if(Session.state == SessionState.CLIENT && MyTimer().time > sentLastUpdate + 1000)
                     ClientData.get!!.mySocket?.write("update=${MyTimer().time}")
 
-                Thread.sleep(50)
+                //  feedback
+                var feedback = ""
+                feedback = if(Session.starts.any { !it.isLaunched }) {
+                    "will start at ${Globals.FORMAT_TIME.format(Session.starts.filter { !it.isLaunched }.minOf { it.timeStamp })}"
+                } else "no start scheduled"
+                runOnUiThread {
+                    vFeedback.text = feedback
+                }
+
+                Thread.sleep(20)
             }
         }
     }

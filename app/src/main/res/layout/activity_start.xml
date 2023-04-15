@@ -11,19 +11,23 @@
         android:layout_height="match_parent"
         />
 
-    <Button
+    <ImageButton
         android:id="@+id/button"
         android:layout_width="50dp"
         android:layout_height="50dp"
         android:layout_centerHorizontal="true"
         android:layout_alignParentBottom="true"
-        android:layout_marginBottom="50dp"
+        android:layout_marginBottom="100dp"
+        android:src="@drawable/ic_stop_24dp"
+        android:background="#0000"
         />
 
     <TextView
         android:id="@+id/start_tLog"
         android:layout_width="match_parent"
         android:layout_height="200dp"
+        android:layout_marginTop="50dp"
+        android:paddingHorizontal="20dp"
         android:textSize="10sp"
         />
 

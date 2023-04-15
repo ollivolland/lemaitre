@@ -20,7 +20,7 @@ class ClientData private constructor(val port: Int, val hostMac:String, val devi
         }
         mySocket = MyServerThread(port).apply {
             addOnRead(finReader)
-            log(mainActivity!!)
+            log{ s -> mainActivity?.log(s) }
         }
     }
 

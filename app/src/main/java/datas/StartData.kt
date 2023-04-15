@@ -34,9 +34,9 @@ data class StartData(val id:Long, val timeStamp:Long, val timeToStart: Long, val
         fun create(timeStamp: Long, command:String, flavor: Long, videoLength: Long): StartData {
             val deltas = mutableListOf(0, flavor)
             when (command) {
-                "kKurz" -> deltas.add(deltas.last() + DURATION_FERTIG_MS + Globals.random.nextLong(1000, 2000))
-                "kMittel" -> deltas.add(deltas.last() + DURATION_FERTIG_MS + Globals.random.nextLong(2000, 3000))
-                "kLang" -> deltas.add(deltas.last() + DURATION_FERTIG_MS + Globals.random.nextLong(3000, 4000))
+                "kKurz" -> deltas.add(deltas.last() + DURATION_FERTIG_MS + Globals.RANDOM.nextLong(1000, 2000))
+                "kMittel" -> deltas.add(deltas.last() + DURATION_FERTIG_MS + Globals.RANDOM.nextLong(2000, 3000))
+                "kLang" -> deltas.add(deltas.last() + DURATION_FERTIG_MS + Globals.RANDOM.nextLong(3000, 4000))
             }
 
             val mps = arrayOf(R.raw.aufdieplaetze, R.raw.fertig, R.raw.gunshot_10db_1s_delayed)

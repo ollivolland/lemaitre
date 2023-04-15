@@ -103,7 +103,7 @@ class MyRequestRecord(private val previewRequest: MyRequestPreview? = null): MyR
 
         if(previewRequest != null) {
             captureBuilder.addTarget(previewRequest.surface)
-            muxer.setOrientationHint(previewRequest.totalRotation) //  totalRotation is 90° wrong
+            muxer.setOrientationHint(previewRequest.totalRotation)
         }
 
         captureSession.setRepeatingRequest(captureBuilder.build(), null, null)

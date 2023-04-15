@@ -10,15 +10,16 @@ import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
 import com.ollivolland.lemaitre.camera.MyCamera2
 import com.ollivolland.lemaitre.camera.MyRequestPreview
-import com.ollivolland.lemaitre.camera.MyRequestRecord
 import datas.StartData
 import kotlin.concurrent.thread
 
 class ActivityStart : AppCompatActivity() {
     lateinit var timer:MyTimer
     lateinit var start: StartData
-    lateinit var mycamera2: MyCamera2
-    lateinit var myRequestRecord: MyRequestRecord
+    lateinit var myCamera2: MyCamera2
+//    lateinit var myRequestRecord: MyRequestRecord
+    var isCameraStarted = true
+    var isCameraStopped = true
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -35,12 +36,20 @@ class ActivityStart : AppCompatActivity() {
 
         //  camera
         if(start.config.isCamera) {
-            val requestPreview = MyRequestPreview(vTexture)
-            val myRequestRecord = MyRequestRecord()
-            mycamera2 = MyCamera2(this)
-                .addRequest(requestPreview)
+            val preview = MyRequestPreview(vTexture)
+//            myRequestRecord = MyRequestRecord(preview)
+            myCamera2 = MyCamera2(this)
+//                .addRequest(myRequestRecord)
+                .addRequest(preview)
                 .open()
-            requestPreview.start()
+
+            //  todo set fps
+
+            preview.start()
+//            myRequestRecord.start()
+
+            isCameraStarted = false
+            isCameraStopped = false
         }
 
         //  mps
@@ -58,7 +67,15 @@ class ActivityStart : AppCompatActivity() {
 
         thread {
             while (isBusy) {
-                if(timer.time >= start.timeStamp + start.commandLength + start.videoLength + DURATION_WAIT_AFTER_FINISH) finish()
+                if(timer.time >= start.timeStamp + start.timeToStart + start.videoLength + DURATION_WAIT_AFTER_FINISH) finish()
+                if(!isCameraStarted && timer.time >= start.timeStamp + start.timeToStart - DURATION_VIDEO_BEFORE_START) {
+                    isCameraStarted = true
+//                    myRequestRecord.startRecord()
+                }
+                if(!isCameraStopped && timer.time >= start.timeStamp + start.timeToStart + start.videoLength) {
+                    isCameraStarted = true
+//                    myRequestRecord.stopRecord()
+                }
 
                 Thread.sleep(20)
             }
@@ -68,11 +85,12 @@ class ActivityStart : AppCompatActivity() {
     override fun onDestroy() {
         super.onDestroy()
         isBusy = false
-        if(this::mycamera2.isInitialized) mycamera2.close()
+        if(this::myCamera2.isInitialized) myCamera2.close()
     }
 
     companion object {
         const val DURATION_WAIT_AFTER_FINISH = 3000L
+        const val DURATION_VIDEO_BEFORE_START = 3000L
 
         var startData: StartData? = null;private set
         var isBusy = false;private set

@@ -12,6 +12,7 @@ import config
 
 class HostData private constructor(val hostName:String, val clients: Array<Client>) {
     val mySockets:Array<MySocket> = Array(clients.size) { i -> MyClientThread(clients[i].ipWifiP2p, clients[i].port) }
+    val lastUpdate:Array<Long> = Array(clients.size) { 0 }
     var command:String = COMMAND_CHOICES[0]
     var flavor:Long = FLAVOR_CHOICES[0]
     var delta:Long = DELTA_CHOICES[0]

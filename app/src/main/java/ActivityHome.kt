@@ -19,6 +19,7 @@ class ActivityHome : AppCompatActivity() {
     lateinit var vLogger: TextView
     private val logs:MutableList<String> = mutableListOf()
     var isRunning = true
+    var sentLastUpdate = 0L
 
     @SuppressLint("MissingPermission")
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -35,6 +36,16 @@ class ActivityHome : AppCompatActivity() {
             val data = HostData.get
             val configMe = ConfigData(data.hostName)
             val configClients = Array(data.clients.size) { i -> ConfigData(data.clients[i].name) }
+
+            //  update
+            for(i in data.mySockets.indices) {
+                //  possible reassignment before lambda call
+                data.mySockets[i].addOnRead {
+                    try {
+                        if (it.startsWith("update=")) data.lastUpdate[i] = it.removePrefix("update=").toLong()
+                    } catch (_:Exception) {}
+                }
+            }
 
             //  ui
             vConfig.visibility = View.VISIBLE
@@ -122,6 +133,9 @@ class ActivityHome : AppCompatActivity() {
                             ActivityStart.launch(this, x)
                             log("do start = $x")
                         }
+
+                if(Session.state == SessionState.CLIENT && MyTimer().time > sentLastUpdate + 1000)
+                    ClientData.get!!.mySocket?.write("update=${MyTimer().time}")
 
                 Thread.sleep(50)
             }

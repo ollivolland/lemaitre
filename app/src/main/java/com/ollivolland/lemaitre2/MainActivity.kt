@@ -43,12 +43,13 @@ class MainActivity : AppCompatActivity() {
     private lateinit var mySocketFormation: MySocket
     var checkNeedAnotherSocket:() -> Unit ={}
 
+    //  todo    indicate clients in main
+    //  todo    change global config
     //  todo    video
     //  todo    video timestamp
     //  todo    persistent socket
 
-    //  todo    mycamera3
-
+    //  todo    mycamera2 from ffekommando 2
     //  todo    socket bug write before close gets killed
     //  todo    firebase crash reporter
     //  todo    cut raw mp3s to size
@@ -71,8 +72,7 @@ class MainActivity : AppCompatActivity() {
         val permissions = mutableListOf(
             Manifest.permission.ACCESS_COARSE_LOCATION,
             Manifest.permission.ACCESS_FINE_LOCATION,
-            Manifest.permission.CAMERA,
-            Manifest.permission.RECORD_AUDIO)
+            Manifest.permission.CAMERA)
         if (Build.VERSION.SDK_INT >= 33) permissions.add(Manifest.permission.NEARBY_WIFI_DEVICES)
         val toGrant = permissions.filter { s -> checkSelfPermission(s) != PackageManager.PERMISSION_GRANTED }.toTypedArray()
 
@@ -81,39 +81,36 @@ class MainActivity : AppCompatActivity() {
         //  ui
         val vHost = findViewById<Button>(R.id.buttonHost)
         val vClient = findViewById<Button>(R.id.buttonClient)
-        val vFin = findViewById<Button>(R.id.buttonFin)
         vLogger = findViewById(R.id.logger)
 
         vHost.setOnClickListener {
             Session.state= SessionState.HOST
             startRegistration()
 
-            vClient.visibility = View.GONE
-            vFin.visibility = View.VISIBLE
-            vHost.isEnabled=false
+            vHost.text = "launch!"
             vClient.isEnabled=false
+            vHost.isEnabled=false
+            vHost.setOnClickListener {
+                HostData.set(thisDeviceName, clients)
+                log("finished with ${clients.size} clients")
+
+                startActivity(Intent(this, ActivityHome::class.java))
+                finish()
+            }
+
+            thread {
+                Thread.sleep(200)
+                runOnUiThread { vHost.isEnabled = true }
+            }
         }
 
         vClient.setOnClickListener {
             Session.state= SessionState.CLIENT
             discover()
 
-            vHost.visibility = View.GONE
-            vFin.visibility = View.GONE
+            vHost.visibility = View.INVISIBLE
             vHost.isEnabled=false
             vClient.isEnabled=false
-        }
-
-        vFin.setOnClickListener {
-            vClient.visibility = View.GONE
-            vHost.visibility = View.GONE
-
-            vFin.isEnabled=false
-            HostData.set(thisDeviceName, clients)
-            log("finished with ${clients.size} clients")
-
-            startActivity(Intent(this, ActivityHome::class.java))
-            finish()
         }
 
         //  setup

@@ -29,7 +29,7 @@ abstract class MySocket(private val port: Int, private val type:String) {
     fun write(byteArray: ByteArray) {
         if(!isOpen) return
         if(!this::mOutputStream.isInitialized) {
-            myOnSocketListener.add { write(byteArray) }
+            myOnSocketListener.add { write(byteArray) } //  broken
             return
         }
 

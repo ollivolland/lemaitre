@@ -6,7 +6,7 @@ import com.ollivolland.lemaitre2.R
 import com.ollivolland.lemaitre2.Session
 import org.json.JSONObject
 
-data class StartData(val id:Long, val timeStamp:Long, val commandLength: Long, val videoLength: Long, val mpStartsBuild:String, val mpIdsBuild:String) {
+data class StartData(val id:Long, val timeStamp:Long, val timeToStart: Long, val videoLength: Long, val mpStartsBuild:String, val mpIdsBuild:String) {
     val config: ConfigData = Session.currentConfig.copy()
     var isLaunched = false
 
@@ -14,7 +14,7 @@ data class StartData(val id:Long, val timeStamp:Long, val commandLength: Long, v
         mySocket.write(JSONObject().apply {
             accumulate("id", id)
             accumulate("timeStamp", timeStamp)
-            accumulate("commandLength", commandLength)
+            accumulate("commandLength", timeToStart)
             accumulate("videoLength", videoLength)
             accumulate("mpStarts", mpStartsBuild)
             accumulate("mps", mpIdsBuild)

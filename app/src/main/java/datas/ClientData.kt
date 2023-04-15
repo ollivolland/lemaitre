@@ -1,10 +1,12 @@
+package datas
+
 import android.content.Intent
 import com.ollivolland.lemaitre2.ActivityHome
 import com.ollivolland.lemaitre2.MainActivity
 import com.ollivolland.lemaitre2.MyServerThread
 import com.ollivolland.lemaitre2.MySocket
 
-class ClientData private constructor(val port: Int, val hostMac:String, val mainActivity: MainActivity?) {
+class ClientData private constructor(val port: Int, val hostMac:String, val deviceName:String, val mainActivity: MainActivity?) {
     var mySocket: MySocket? = null
 
     init {
@@ -23,10 +25,10 @@ class ClientData private constructor(val port: Int, val hostMac:String, val main
     }
 
     companion object {
-        var get:ClientData? = null; private set
+        var get: ClientData? = null; private set
 
         fun set(port:Int, hostMac: String, mainActivity: MainActivity){
-            get = ClientData(port, hostMac, mainActivity)
+            get = ClientData(port, hostMac, mainActivity.thisDeviceName, mainActivity)
         }
     }
 }

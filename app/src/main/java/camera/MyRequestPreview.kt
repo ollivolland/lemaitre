@@ -48,8 +48,6 @@ class MyRequestPreview(private val vTextureView: TextureView): MyRequest() {
                 configureTransform(vTextureView, width, height, sizes[0])
 
                 surface = Surface(vTextureView.surfaceTexture!!)
-                
-//                if (Build.VERSION.SDK_INT >= 30) surface.setFrameRate(30f, Surface.FRAME_RATE_COMPATIBILITY_FIXED_SOURCE)
             }
 
             override fun onSurfaceTextureSizeChanged(p0: SurfaceTexture, p1: Int, p2: Int) = Unit
@@ -59,7 +57,6 @@ class MyRequestPreview(private val vTextureView: TextureView): MyRequest() {
     }
     
     override fun onStart() {
-
         val captureBuilder = myCamera2.cameraDevice.createCaptureRequest(CameraDevice.TEMPLATE_PREVIEW)
         captureBuilder[CaptureRequest.CONTROL_AF_MODE] = CaptureRequest.CONTROL_AF_MODE_CONTINUOUS_PICTURE
         captureBuilder.addTarget(surface)

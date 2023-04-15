@@ -1,3 +1,5 @@
+package datas
+
 import android.app.Dialog
 import android.content.Context
 import android.widget.Spinner
@@ -6,6 +8,7 @@ import com.ollivolland.lemaitre2.Client
 import com.ollivolland.lemaitre2.MyClientThread
 import com.ollivolland.lemaitre2.MySocket
 import com.ollivolland.lemaitre2.R
+import config
 
 class HostData private constructor(val hostName:String, val clients: Array<Client>) {
     val mySockets:Array<MySocket> = Array(clients.size) { i -> MyClientThread(clients[i].ipWifiP2p, clients[i].port) }
@@ -28,7 +31,7 @@ class HostData private constructor(val hostName:String, val clients: Array<Clien
         val DELTA_CHOICES = arrayOf(3_000L, 10_000L, 30_000L)
         val DELTA_DESCRIPTIONS = arrayOf("3s", "10s", "30s")
 
-        var get:HostData = HostData("", arrayOf()); private set
+        var get: HostData = HostData("", arrayOf()); private set
 
         fun set(hostName: String, clients: MutableList<Client>){
             get = HostData(hostName, clients.toTypedArray())

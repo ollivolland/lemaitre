@@ -1,7 +1,6 @@
 package com.ollivolland.lemaitre2
 
 import MyTimer
-import StartData
 import android.content.Context
 import android.content.Intent
 import android.media.MediaPlayer
@@ -11,12 +10,15 @@ import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
 import com.ollivolland.lemaitre.camera.MyCamera2
 import com.ollivolland.lemaitre.camera.MyRequestPreview
+import com.ollivolland.lemaitre.camera.MyRequestRecord
+import datas.StartData
 import kotlin.concurrent.thread
 
 class ActivityStart : AppCompatActivity() {
     lateinit var timer:MyTimer
     lateinit var start: StartData
     lateinit var mycamera2: MyCamera2
+    lateinit var myRequestRecord: MyRequestRecord
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -34,6 +36,7 @@ class ActivityStart : AppCompatActivity() {
         //  camera
         if(start.config.isCamera) {
             val requestPreview = MyRequestPreview(vTexture)
+            val myRequestRecord = MyRequestRecord()
             mycamera2 = MyCamera2(this)
                 .addRequest(requestPreview)
                 .open()
@@ -42,8 +45,7 @@ class ActivityStart : AppCompatActivity() {
 
         //  mps
         if(start.config.isCommand) {
-            val ids = arrayOf(R.raw.aufdieplaetze, R.raw.fertig, R.raw.gunshot_10db_1s_delayed)
-            val mps = Array<MediaPlayer>(ids.size) { i -> MediaPlayer.create(this, ids[i]) }
+            val mps = Array<MediaPlayer>(start.mpIds.size) { i -> MediaPlayer.create(this, start.mpIds[i]) }
             for (x in mps) x.setOnCompletionListener { x.release() }
 
             thread {
@@ -55,8 +57,11 @@ class ActivityStart : AppCompatActivity() {
         }
 
         thread {
-            timer.lock(start.timeStamp + start.commandLength + start.videoLength + DURATION_WAIT_AFTER_FINISH)
-            finish()
+            while (isBusy) {
+                if(timer.time >= start.timeStamp + start.commandLength + start.videoLength + DURATION_WAIT_AFTER_FINISH) finish()
+
+                Thread.sleep(20)
+            }
         }
     }
 
@@ -69,7 +74,7 @@ class ActivityStart : AppCompatActivity() {
     companion object {
         const val DURATION_WAIT_AFTER_FINISH = 3000L
 
-        var startData:StartData? = null;private set
+        var startData: StartData? = null;private set
         var isBusy = false;private set
 
         fun launch(context: Context, startData: StartData) {

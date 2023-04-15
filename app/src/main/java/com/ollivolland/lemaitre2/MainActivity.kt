@@ -1,7 +1,6 @@
 package com.ollivolland.lemaitre2
 
-import ClientData
-import HostData
+import MyWifiP2pActionListener
 import android.Manifest
 import android.content.BroadcastReceiver
 import android.content.Context
@@ -14,7 +13,6 @@ import android.net.wifi.WpsInfo
 import android.net.wifi.p2p.WifiP2pConfig
 import android.net.wifi.p2p.WifiP2pDevice
 import android.net.wifi.p2p.WifiP2pManager
-import android.net.wifi.p2p.WifiP2pManager.ActionListener
 import android.net.wifi.p2p.nsd.WifiP2pDnsSdServiceInfo
 import android.net.wifi.p2p.nsd.WifiP2pDnsSdServiceRequest
 import android.os.Build
@@ -25,6 +23,8 @@ import android.widget.Button
 import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
+import datas.ClientData
+import datas.HostData
 import org.json.JSONObject
 import kotlin.concurrent.thread
 
@@ -43,13 +43,15 @@ class MainActivity : AppCompatActivity() {
     private lateinit var mySocketFormation: MySocket
     var checkNeedAnotherSocket:() -> Unit ={}
 
-    //  todo    config communication
-    //  todo    start communication
-
-    //  todo    cut raw mp3s
     //  todo    video
     //  todo    video timestamp
     //  todo    persistent socket
+
+    //  todo    mycamera3
+
+    //  todo    socket bug write before close gets killed
+    //  todo    firebase crash reporter
+    //  todo    cut raw mp3s to size
 
     private var isRunning = true
     private var isConnected = false
@@ -407,35 +409,3 @@ class MyWiFiDirectBroadcastReceiver(
     }
 }
 
-class MyWifiP2pActionListener(private val message:String = ""):ActionListener {
-    private var mySuccess:() -> Unit = {}
-    private var myFailure:() -> Unit = {}
-    private var myComplete:() -> Unit = {}
-
-    fun setOnSuccess(action:() -> Unit):MyWifiP2pActionListener {
-        mySuccess=action
-        return this
-    }
-
-    fun setOnFailure(action:() -> Unit):MyWifiP2pActionListener {
-        myFailure=action
-        return this
-    }
-
-    fun setOnComplete(action:() -> Unit):MyWifiP2pActionListener {
-        myComplete=action
-        return this
-    }
-
-    override fun onSuccess() {
-        if(message.isNotEmpty()) println("$message success")
-        mySuccess()
-        myComplete()
-    }
-
-    override fun onFailure(p0: Int) {
-        if(message.isNotEmpty()) println("$message success")
-        myFailure()
-        myComplete()
-    }
-}

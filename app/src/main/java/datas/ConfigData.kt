@@ -2,6 +2,7 @@ package datas
 
 import android.app.Dialog
 import android.content.Context
+import android.view.View
 import android.widget.Spinner
 import android.widget.TextView
 import com.google.android.material.switchmaterial.SwitchMaterial
@@ -26,13 +27,23 @@ class ConfigData(val deviceName:String) {
         val vSwitchGate = d.findViewById<SwitchMaterial>(R.id.client_sGate)
         val vSpinnerFps = d.findViewById<Spinner>(R.id.client_sFps)
 
-
         vTitle.text = deviceName
 
         vSpinnerFps.config(FPS_DESCRITPTIONS) { i -> fps = FPS_CHOICES[i] }
         vSwitchCommand.setOnCheckedChangeListener { _, isChecked -> isCommand = isChecked }
-        vSwitchCamera.setOnCheckedChangeListener { _, isChecked -> isCamera = isChecked }
-        vSwitchGate.setOnCheckedChangeListener { _, isChecked -> isGate = isChecked }
+        vSwitchCamera.setOnCheckedChangeListener { _, isChecked ->
+            isCamera = isChecked
+            
+            vSpinnerFps.visibility = if(isCamera) View.VISIBLE else View.GONE
+        }
+        vSwitchGate.setOnCheckedChangeListener { _, isChecked ->
+            isGate = isChecked
+            if(isGate) {
+                vSpinnerFps.setSelection(0)    //  set to 30 fps
+                vSpinnerFps.isEnabled = false
+            }
+            else vSpinnerFps.isEnabled = true
+        }
 
         d.show()
         return d

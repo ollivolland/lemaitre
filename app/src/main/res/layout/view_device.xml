@@ -11,8 +11,10 @@
         android:layout_height="50dp"
         android:layout_alignParentEnd="true"
         android:layout_marginEnd="30dp"
-        android:src="@drawable/ic_config_24dp"
+        android:src="@drawable/sharp_settings_24"
+        android:scaleType="fitCenter"
         android:background="#0000"
+        android:padding="10dp"
         />
 
     <LinearLayout

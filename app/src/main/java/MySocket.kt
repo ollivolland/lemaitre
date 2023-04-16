@@ -86,6 +86,7 @@ class MyClientThread(private val inetAddress: String, port: Int): MySocket(port,
             }
 
             while (!isInputOpen) Thread.sleep(1)
+            Thread.sleep(100)
 
             socket.close()
             for (x in myOnCloseListeners) x()

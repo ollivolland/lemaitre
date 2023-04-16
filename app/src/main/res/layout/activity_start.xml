@@ -12,14 +12,17 @@
         />
 
     <ImageButton
-        android:id="@+id/button"
-        android:layout_width="50dp"
-        android:layout_height="50dp"
+        android:id="@+id/start_bStop"
+        android:layout_width="70dp"
+        android:layout_height="70dp"
         android:layout_centerHorizontal="true"
         android:layout_alignParentBottom="true"
         android:layout_marginBottom="100dp"
-        android:src="@drawable/ic_stop_24dp"
+        android:src="@drawable/sharp_crop_square_24"
+        android:scaleType="fitCenter"
         android:background="#0000"
+        android:padding="10dp"
+        android:contentDescription="stop"
         />
 
     <TextView
@@ -29,6 +32,18 @@
         android:layout_marginTop="50dp"
         android:paddingHorizontal="20dp"
         android:textSize="10sp"
+        android:textColor="#0f0"
+        />
+    
+    <View
+        android:id="@+id/start_vGateLine"
+        android:layout_width="2px"
+        android:layout_height="match_parent"
+        android:layout_centerHorizontal="true"
+        android:layout_marginTop="100dp"
+        android:layout_marginBottom="200dp"
+        android:background="#0f0"
+        android:visibility="gone"
         />
 
 </RelativeLayout>

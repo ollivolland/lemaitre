@@ -2,10 +2,7 @@ package com.ollivolland.lemaitre2
 
 import MyWifiP2pActionListener
 import android.Manifest
-import android.content.BroadcastReceiver
-import android.content.Context
-import android.content.Intent
-import android.content.IntentFilter
+import android.content.*
 import android.content.pm.PackageManager
 import android.location.LocationManager
 import android.net.wifi.WifiManager
@@ -23,6 +20,11 @@ import android.widget.Button
 import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
+import com.google.android.gms.common.api.ResolvableApiException
+import com.google.android.gms.location.LocationRequest
+import com.google.android.gms.location.LocationServices
+import com.google.android.gms.location.LocationSettingsRequest
+import com.google.android.gms.location.SettingsClient
 import datas.ClientData
 import datas.HostData
 import org.json.JSONObject
@@ -42,19 +44,23 @@ class MainActivity : AppCompatActivity() {
     private lateinit var hostMac:String
     private lateinit var mySocketFormation: MySocket
     var checkNeedAnotherSocket:() -> Unit ={}
-
+    
+    //  urgent
+    //  todo    cut raw mp3s to size
+    //  todo    timer from gps
+    //  todo    indicate done starts
+    //  todo    video timestamp
+    
+    //  todo    persistent socket
     //  todo    dialog spinner info
     //  todo    persistent wifip2p
-    //  todo    wakelock
     //  todo    change global config
-    //  todo    video
-    //  todo    video timestamp
-    //  todo    persistent socket
 
-    //  todo    mycamera2 from ffekommando 2
-    //  todo    socket bug write before close gets killed
     //  todo    firebase crash reporter
-    //  todo    cut raw mp3s to size
+    
+    //  BUGS
+    //  todo    socket write before close gets killed
+    //  todo    mp3 gets killed if played right after each other
 
     private var isRunning = true
     private var isConnected = false
@@ -131,9 +137,8 @@ class MainActivity : AppCompatActivity() {
         }
 
         //  enable location
-        if(!locationManager.isProviderEnabled(LocationManager.GPS_PROVIDER)) {
-            startActivityForResult(Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS), 1)
-        }
+        if(!locationManager.isProviderEnabled(LocationManager.GPS_PROVIDER))
+            buildAlertMessageNoGps()
 
         //  reset all wifiP2p connections, groups and services
         manager.stopPeerDiscovery(channel, MyWifiP2pActionListener("stopPeerDiscovery").setOnComplete {
@@ -260,25 +265,23 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun buildAlertMessageNoGps() {
-        startActivityForResult(Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS), 1)
+        val locationRequest = LocationRequest.create().setPriority(LocationRequest.PRIORITY_HIGH_ACCURACY).setInterval(100).setFastestInterval(100)
+        val builder = LocationSettingsRequest.Builder().addLocationRequest(locationRequest).setAlwaysShow(true)
+        val client: SettingsClient = LocationServices.getSettingsClient(this)
 
-//        val locationRequest = LocationRequest.create().setPriority(LocationRequest.PRIORITY_HIGH_ACCURACY).setInterval(100).setFastestInterval(100)
-//        val builder = LocationSettingsRequest.Builder().addLocationRequest(locationRequest).setAlwaysShow(true)
-//        val client: SettingsClient = LocationServices.getSettingsClient(this)
-//
-//        client.checkLocationSettings(builder.build())
-//            .addOnSuccessListener {
-//                Toast.makeText(this, "Gps is enabled", Toast.LENGTH_LONG).show()
-//            }
-//            .addOnFailureListener { exception ->
-//                if (exception is ResolvableApiException) {
-//                    try {
-//                        exception.startResolutionForResult(this, 1000)
-//                    } catch (sendEx: SendIntentException) {
-//                        startActivity(Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS))
-//                    }
-//                } else startActivity(Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS))
-//            }
+        client.checkLocationSettings(builder.build())
+            .addOnSuccessListener {
+                Toast.makeText(this, "Gps is enabled", Toast.LENGTH_LONG).show()
+            }
+            .addOnFailureListener { exception ->
+                if (exception is ResolvableApiException) {
+                    try {
+                        exception.startResolutionForResult(this, 1000)
+                    } catch (sendEx: IntentSender.SendIntentException) {
+                        startActivity(Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS))
+                    }
+                } else startActivity(Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS))
+            }
     }
 
     private fun discover() {

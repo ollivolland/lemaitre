@@ -14,6 +14,7 @@ import datas.ClientData
 import datas.ConfigData
 import datas.HostData
 import datas.StartData
+import wakelock.MyWakeLock
 import java.util.*
 import kotlin.concurrent.thread
 
@@ -23,6 +24,7 @@ class ActivityHome : AppCompatActivity() {
     private val logs:MutableList<String> = mutableListOf()
     var isRunning = true
     var sentLastUpdate = 0L
+    private val wakeLock = MyWakeLock()
 
     @SuppressLint("MissingPermission")
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -62,6 +64,12 @@ class ActivityHome : AppCompatActivity() {
                 Session.starts.add(start)
                 log("sent start $start")
                 for (x in data.mySockets) start.send(x)
+                
+                vStart.isEnabled = false
+                thread {
+                    Thread.sleep(500)
+                    runOnUiThread { vStart.isEnabled = true }
+                }
             }
 
             layoutInflater.inflate(R.layout.view_device, vConfig).also { root ->
@@ -114,7 +122,9 @@ class ActivityHome : AppCompatActivity() {
             }
         }
 
+        //  misc
         GpsTime.register(this)
+        wakeLock.acquire(this)
 
         //  blinker
         thread {
@@ -160,6 +170,7 @@ class ActivityHome : AppCompatActivity() {
         super.onDestroy()
         isRunning = false
         GpsTime.unregister()
+        wakeLock.release()
     }
 
 //    fun getNetworkTime():Long {

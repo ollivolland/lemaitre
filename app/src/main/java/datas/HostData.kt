@@ -29,8 +29,8 @@ class HostData private constructor(val hostName:String, val clients: Array<Clien
         val FLAVOR_DESCRIPTIONS = arrayOf("10s", "20s", "30s")
         val DURATION_CHOICES = arrayOf(10_000L, 30_000L, 60_000L)
         val DURATION_DESCRIPTIONS = arrayOf("10s", "30s", "60s")
-        val DELTA_CHOICES = arrayOf(5_000L, 10_000L, 60_000L)
-        val DELTA_DESCRIPTIONS = arrayOf("5s", "10s", "60s")
+        val DELTA_CHOICES = arrayOf(3_000L, 10_000L, 60_000L)
+        val DELTA_DESCRIPTIONS = arrayOf("3s", "10s", "60s")
 
         var get: HostData = HostData("", arrayOf()); private set
 

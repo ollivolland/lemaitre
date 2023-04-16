@@ -1,14 +1,18 @@
-package com.ollivolland.lemaitre.camera
+package mycamera2
 
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.ImageFormat
 import android.media.Image
-import android.renderscript.*
-import androidx.annotation.IntDef
+import android.renderscript.Allocation
+import android.renderscript.Element
+import android.renderscript.RenderScript
+import android.renderscript.ScriptIntrinsicYuvToRGB
+import android.renderscript.Type
 import java.nio.ByteBuffer
+import androidx.annotation.IntDef
 
-/*
+/**
 This file is converted from part of https://github.com/gordinmitya/yuv2buf.
 Follow the link to find demo app, performance benchmarks and unit tests.
 Intro to YUV image formats:

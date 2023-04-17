@@ -2,6 +2,7 @@ package com.ollivolland.lemaitre2
 
 import MyWifiP2pActionListener
 import android.Manifest
+import android.annotation.SuppressLint
 import android.content.*
 import android.content.pm.PackageManager
 import android.location.LocationManager
@@ -287,6 +288,7 @@ class MainActivity : AppCompatActivity() {
             }
     }
 
+    @SuppressLint("MissingPermission")
     private fun discover() {
         manager.setDnsSdResponseListeners(channel,
             { instanceName, registrationType, resourceType -> log("servlistener: $instanceName $registrationType ${resourceType.deviceName} ${resourceType.deviceAddress}") },
@@ -319,6 +321,7 @@ class MainActivity : AppCompatActivity() {
         })
     }
 
+    @SuppressLint("MissingPermission")
     private fun startRegistration() {
         //  Pass it an instance name, service type (_protocol._transportlayer) , and the map containing information other devices will want once they connect to this one.
         val serviceInfo1 = WifiP2pDnsSdServiceInfo.newInstance(SERVICE_NAME, SERVICE_TYPE, mapOf())
@@ -369,6 +372,7 @@ class MyWiFiDirectBroadcastReceiver(
     private val channel: WifiP2pManager.Channel,
     private val activity: MainActivity
 ) : BroadcastReceiver() {
+    @SuppressLint("MissingPermission")
     override fun onReceive(context: Context, intent: Intent) {
         when (intent.action!!) {
             WifiP2pManager.WIFI_P2P_THIS_DEVICE_CHANGED_ACTION -> {

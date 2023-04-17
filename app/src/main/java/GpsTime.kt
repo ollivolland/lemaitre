@@ -11,27 +11,24 @@ import android.util.Log
 
 class GpsTime {
     companion object {
-        private var isFirstLocation = true
+        var numObservations = 0;private set
+        var timeOfBoot = System.currentTimeMillis() - SystemClock.elapsedRealtime();private set
         private val timeToBootList:MutableList<Long> = mutableListOf()
-        var timeOfBoot = System.currentTimeMillis() - SystemClock.elapsedRealtime()
-        lateinit var locationManager: LocationManager
+        private lateinit var locationManager: LocationManager
         private val locationListener = object : LocationListener {
             override fun onLocationChanged(location: Location) {
                 val thisTimeToBoot = location.time - location.elapsedRealtimeNanos / 1_000_000L
 
-                if (isFirstLocation) isFirstLocation = false
-                else timeToBootList.add(thisTimeToBoot)
+                if (numObservations >= 1) timeToBootList.add(thisTimeToBoot)
                 if (timeToBootList.count() > 300) timeToBootList.removeAt(0)
 
-                Log.v(
-                    "LOCATION",
-//                "Time GPS: ${Globals.formatTimeToMillis.format(location.time)}, " +
-                    "delay = $thisTimeToBoot (${location.provider})"
-                )
+                Log.v("LOCATION", "Time GPS: ${Globals.FORMAT_TIME.format(location.time)}," +
+                        "TimeToBoot = $thisTimeToBoot (${location.provider})")
 
                 timeOfBoot = if(timeToBootList.isEmpty()) 0 else timeToBootList.average().toLong()
 
-                if(timeToBootList.size >= 100) unregister()
+                if(numObservations > 100) unregister()
+                numObservations++
             }
 
             override fun onProviderEnabled(provider: String) {}

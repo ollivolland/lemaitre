@@ -29,21 +29,34 @@ data class StartData(val id:Long, val timeStamp:Long, val timeToStart: Long, val
     }
 
     companion object {
-        private const val DURATION_FERTIG_MS = 500  //  todo    inaccurate
+        private const val DURATION_FERTIG_MS:Long = 700
 
         fun create(timeStamp: Long, command:String, flavor: Long, videoLength: Long): StartData {
-            val deltas = mutableListOf(0, flavor)
+            val builder = Mp3Builder()
+            
             when (command) {
-                "kKurz" -> deltas.add(deltas.last() + DURATION_FERTIG_MS + Globals.RANDOM.nextLong(1000, 2000))
-                "kMittel" -> deltas.add(deltas.last() + DURATION_FERTIG_MS + Globals.RANDOM.nextLong(2000, 3000))
-                "kLang" -> deltas.add(deltas.last() + DURATION_FERTIG_MS + Globals.RANDOM.nextLong(3000, 4000))
+                HostData.COMMAND_KURZ -> {
+                    builder[R.raw.aufdieplaetze_5db] = 0
+                    builder[R.raw.fertig_5db, flavor] = DURATION_FERTIG_MS
+                    builder[R.raw.gunshot_10db] = Globals.RANDOM.nextLong(1000, 2000)
+                }
+                HostData.COMMAND_MITTEL -> {
+                    builder[R.raw.aufdieplaetze_5db] = 0
+                    builder[R.raw.fertig_5db, flavor] = DURATION_FERTIG_MS
+                    builder[R.raw.gunshot_10db] = Globals.RANDOM.nextLong(2000, 3000)
+                }
+                HostData.COMMAND_LANG -> {
+                    builder[R.raw.aufdieplaetze_5db] = 0
+                    builder[R.raw.fertig_5db, flavor] = DURATION_FERTIG_MS
+                    builder[R.raw.gunshot_10db] = Globals.RANDOM.nextLong(3000, 4000)
+                }
+                HostData.COMMAND_BIEP -> {
+                    builder[R.raw.aufdieplaetze_5db] = 0
+                    builder[R.raw.beep_5db] = flavor
+                }
             }
 
-            val mps = arrayOf(R.raw.aufdieplaetze, R.raw.fertig, R.raw.gunshot_10db_1s_delayed)
-
-            return StartData(System.currentTimeMillis(), timeStamp, deltas.last(), videoLength,
-                Array(deltas.size) { i -> timeStamp + deltas[i] }.joinToString(","),
-                mps.joinToString(","))
+            return StartData(System.currentTimeMillis(), timeStamp, builder.lastEndMs, videoLength, builder.getBuiltDeltas(timeStamp), builder.getBuiltIds())
         }
 
         fun tryReceive(s:String, action:(StartData)->Unit) {
@@ -67,5 +80,28 @@ data class StartData(val id:Long, val timeStamp:Long, val timeToStart: Long, val
                 )
             }
         }
+    }
+}
+
+internal class Mp3Builder {
+    private val deltas = mutableListOf<Long>()
+    private val ids = mutableListOf<Int>()
+    var lastEndMs = 0L
+    
+    operator fun set(id:Int, beforeMs:Long) = set(id, beforeMs, 0)
+    
+    operator fun set(id:Int, beforeMs:Long, afterMS: Long) {
+        ids.add(id)
+        lastEndMs += beforeMs
+        deltas.add(lastEndMs)
+        lastEndMs += afterMS
+    }
+    
+    fun getBuiltDeltas(timeStamp: Long):String {
+        return deltas.joinToString(",") { delta -> (timeStamp + delta).toString() }
+    }
+    
+    fun getBuiltIds():String {
+        return ids.joinToString(",")
     }
 }

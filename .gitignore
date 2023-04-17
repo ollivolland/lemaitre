@@ -1,7 +1,6 @@
 *.iml
 .gradle
 /local.properties
-/.idea/
 .DS_Store
 /build
 /captures
@@ -11,3 +10,4 @@ local.properties
 
 # Project exclude paths
 /gradle/
+/.idea/

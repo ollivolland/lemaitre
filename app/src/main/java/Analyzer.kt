@@ -31,6 +31,7 @@ class Analyzer(context: Context, myCamera2: MyCamera2, val myTimer: MyTimer, val
 	private val needed = mutableListOf<Int>()
 	var isHasStreakStarted = false
 	var streakMaxBroken = 0
+	val onStreakStartedListeners = mutableListOf<(Long)->Unit>()
 	
 	private val listenTo = ImageReader.OnImageAvailableListener {
 		val image = it.acquireLatestImage() ?: return@OnImageAvailableListener
@@ -51,6 +52,9 @@ class Analyzer(context: Context, myCamera2: MyCamera2, val myTimer: MyTimer, val
 					streakMaxBroken = 0
 					needed.add(index)
 					println("STREAK STARTED")
+					
+					val timeFrameMs =  myTimer.timeOfBoot + timesMs[index] - timeStart
+					thread { for(x in onStreakStartedListeners) x(timeFrameMs) }
 				}
 				else if(isHasStreakStarted && !isBroken[index]) {
 					isHasStreakStarted = false

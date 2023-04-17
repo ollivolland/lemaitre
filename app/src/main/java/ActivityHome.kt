@@ -2,6 +2,7 @@ package com.ollivolland.lemaitre2
 
 import Globals
 import MyTimer
+import ViewDevice
 import android.annotation.SuppressLint
 import android.os.Bundle
 import android.os.SystemClock
@@ -25,6 +26,9 @@ class ActivityHome : AppCompatActivity() {
     var isRunning = true
     var sentLastUpdate = 0L
     private val wakeLock = MyWakeLock()
+    private lateinit var viewGlobal:ViewDevice
+    private lateinit var viewConfigMe:ViewDevice
+    private lateinit var viewConfigClients:Array<ViewDevice>
 
     @SuppressLint("MissingPermission")
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -71,18 +75,17 @@ class ActivityHome : AppCompatActivity() {
                     runOnUiThread { vStart.isEnabled = true }
                 }
             }
-
-            layoutInflater.inflate(R.layout.view_device, vConfig).also { root ->
-                root.findViewById<TextView>(R.id.device_tTitle).text = data.hostName
-                root.findViewById<TextView>(R.id.device_tDesc).text = "host"
+    
+            viewGlobal = ViewDevice(this, vConfig)
+            viewGlobal.vSettings.setOnClickListener {
+                HostData.createRoot(this).setOnCancelListener { tryUpdateViewGlobal() }
             }
-            for (x in configClients) {
-                layoutInflater.inflate(R.layout.view_device, vConfig, false).also { root ->
-                    root.findViewById<TextView>(R.id.device_tTitle).text = x.deviceName
-                    root.findViewById<TextView>(R.id.device_tDesc).text = "client"
-                    vConfig.addView(root)
-                }
-            }
+            tryUpdateViewGlobal()
+    
+            viewConfigMe = ViewDevice(this, vConfig)
+            configMe.setView(viewConfigMe, this, "host")
+    
+            viewConfigClients = Array(configClients.size) { ViewDevice(this, vConfig) }
 
             //  dialogs
             var iClient = 0
@@ -90,17 +93,22 @@ class ActivityHome : AppCompatActivity() {
             dialogClient = {
                 if(iClient < configClients.size) {
                     configClients[iClient].createRoot(this).setOnCancelListener {
+                        configClients[iClient].setView(viewConfigClients[iClient], this, "client")
                         configClients[iClient].send(data.mySockets[iClient])
                         log("sent config ${configClients[iClient]}")
+                        
                         iClient++
                         dialogClient()
                     }
                 }
             }
             HostData.createRoot(this).setOnCancelListener {
+                tryUpdateViewGlobal()
+    
                 Session.currentConfig = configMe
-
                 configMe.createRoot(this).setOnCancelListener {
+                    configMe.updateView(viewConfigMe, "host")
+                    
                     dialogClient()
                 }
             }
@@ -129,7 +137,7 @@ class ActivityHome : AppCompatActivity() {
         //  blinker
         thread {
             while (isRunning) {
-                val should = if(getTime() % 1000 < 200) View.VISIBLE else View.INVISIBLE
+                val should = if(MyTimer().time % 1000 < 200) View.VISIBLE else View.INVISIBLE
                 if(vBlinker.visibility != should) runOnUiThread { vBlinker.visibility = should }
 
                 Thread.sleep(1)
@@ -142,7 +150,7 @@ class ActivityHome : AppCompatActivity() {
                 //  start starts
                 if(!ActivityStart.isBusy)
                     for (x in Session.starts)
-                        if(!x.isLaunched && x.timeStamp < getTime() + TIME_START)
+                        if(!x.isLaunched && x.timeStamp < MyTimer().time + TIME_START)
                         {
                             ActivityStart.launch(this, x)
                             log("do start = $x")
@@ -172,14 +180,17 @@ class ActivityHome : AppCompatActivity() {
         GpsTime.unregister()
         wakeLock.release()
     }
+    
+    fun tryUpdateViewGlobal() {
+        if(this::viewGlobal.isInitialized) {
+            viewGlobal.vTitle.text = HostData.get.command
+            viewGlobal.vDesc.text = "flavor:${HostData.get.flavor/1000}s length:${HostData.get.videoLength/1000}s Δ:+${HostData.get.delta/1000}s"
+        }
+    }
 
 //    fun getNetworkTime():Long {
 //        val timeClient = NTPUDPClient()
 //    }
-
-    fun getTime():Long {
-        return GpsTime.timeOfBoot + SystemClock.elapsedRealtime()
-    }
 
     fun log(string: String) {
         println(string)

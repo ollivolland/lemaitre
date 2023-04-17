@@ -46,17 +46,18 @@ class MainActivity : AppCompatActivity() {
     var checkNeedAnotherSocket:() -> Unit ={}
     
     //  urgent
-    //  todo    cut raw mp3s to size
-    //  todo    timer from gps
     //  todo    indicate done starts
+    //  todo    indicate gate times
     //  todo    video timestamp
     
+    //  todo    net time
     //  todo    persistent socket
     //  todo    dialog spinner info
     //  todo    persistent wifip2p
     //  todo    change global config
 
     //  todo    firebase crash reporter
+    //  todo    net time
     
     //  BUGS
     //  todo    socket write before close gets killed

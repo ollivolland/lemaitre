@@ -7,6 +7,6 @@ class Globals {
         
         val RANDOM = Random(System.currentTimeMillis())
         val FORMAT_TIME = SimpleDateFormat("HH:mm:ss")
-        val FORMAT_TIME_FILE = SimpleDateFormat("HH-mm-ss")
+        val FORMAT_TIME_FILE = SimpleDateFormat("yyyy-MM-dd_HH-mm-ss")
     }
 }

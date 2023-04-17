@@ -23,6 +23,7 @@ class ActivityStart : AppCompatActivity() {
     lateinit var myCamera2: MyCamera2
     private lateinit var myRecorder: MyRecorder
     private lateinit var analyzer: Analyzer
+    private val mps = mutableListOf<MediaPlayer>()
     private var isCameraStarted = true; private var isCameraStopped = true
     private var isGateStarted = true; private var isGateStopped = true
 
@@ -39,7 +40,7 @@ class ActivityStart : AppCompatActivity() {
         val vGateLine = findViewById<View>(R.id.start_vGateLine)
         val vStop = findViewById<ImageButton>(R.id.start_bStop)
 
-        vLog.text = "$start\n\n${start.config}"
+        vLog.text = "$start\n${start.config}"
 
         //  camera
         if(start.config.isCamera || start.config.isGate) {
@@ -59,6 +60,9 @@ class ActivityStart : AppCompatActivity() {
         //  Gate
         if(start.config.isGate) {
             analyzer = Analyzer(this, myCamera2, timer, start.timeStamp + start.timeToStart)
+            analyzer.onStreakStartedListeners.add {
+                runOnUiThread { vLog.text = "${vLog.text}\ngate: ${it/1000}.${String.format("%03d", it%1000)} s" }
+            }
             vGateLine.visibility = View.VISIBLE
             isGateStarted = false
             isGateStopped = false
@@ -71,15 +75,19 @@ class ActivityStart : AppCompatActivity() {
 
         //  mps
         if(start.config.isCommand) {
-            val mps = Array<MediaPlayer>(start.mpIds.size) { i -> MediaPlayer.create(this, start.mpIds[i]) }
-            for (x in mps) x.setOnCompletionListener { x.release() }
+            mps.addAll(Array(start.mpIds.size) { i -> MediaPlayer.create(this, start.mpIds[i]) })
+            mps.add(MediaPlayer.create(this, R.raw.whitenoise_point_001db)) //  needs to play non-silent audio for box
 
-            thread {
-                for (i in mps.indices) {
+//            thread {
+            for (i in start.mpIds.indices) {
+                thread {
                     timer.lock(start.mpStarts[i])
-                    mps[i].start()
+                    if(!this.isDestroyed) mps[i].start()
                 }
             }
+            
+            mps.last().isLooping = true
+            mps.last().start()
         }
 
         thread {
@@ -91,28 +99,28 @@ class ActivityStart : AppCompatActivity() {
                     isCameraStarted = true
                     myRecorder.startRecord()
                     
-                    runOnUiThread { vLog.text = "${vLog.text}\n\nvideo started" }
+                    runOnUiThread { vLog.text = "${vLog.text}\nvideo started" }
                 }
                 if(!isCameraStopped && timer.time >= start.timeStamp + start.timeToStart + start.videoLength) {
                     isCameraStopped = true
                     myRecorder.stopRecord()
                     
-                    runOnUiThread { vLog.text = "${vLog.text}\n\nvideo stopped" }
+                    runOnUiThread { vLog.text = "${vLog.text}\nvideo stopped" }
                 }
                 
                 //  gate
-                if(!isGateStarted && timer.time >= start.timeStamp + start.timeToStart - DURATION_VIDEO_BEFORE_START) {
+                if(!isGateStarted && timer.time >= start.timeStamp + start.timeToStart) {
                     isGateStarted = true
                     analyzer.isWant = true
                     
-                    runOnUiThread { vLog.text = "${vLog.text}\n\ngate started" }
+                    runOnUiThread { vLog.text = "${vLog.text}\ngate started" }
                 }
                 if(!isGateStopped && timer.time >= start.timeStamp + start.timeToStart + start.videoLength) {
                     isGateStopped = true
                     analyzer.isWant = false
                     analyzer.postProcessing()
                     
-                    runOnUiThread { vLog.text = "${vLog.text}\n\ngate stopped" }
+                    runOnUiThread { vLog.text = "${vLog.text}\ngate stopped" }
                 }
 
                 Thread.sleep(20)
@@ -124,6 +132,7 @@ class ActivityStart : AppCompatActivity() {
         super.onDestroy()
         isBusy = false
         if(this::myCamera2.isInitialized) myCamera2.close()
+        mps.forEach { it.release() }
     }
 
     companion object {

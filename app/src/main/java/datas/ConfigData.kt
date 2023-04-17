@@ -1,5 +1,6 @@
 package datas
 
+import ViewDevice
 import android.app.Dialog
 import android.content.Context
 import android.view.View
@@ -29,13 +30,20 @@ class ConfigData(val deviceName:String) {
 
         vTitle.text = deviceName
 
-        vSpinnerFps.config(FPS_DESCRITPTIONS) { i -> fps = FPS_CHOICES[i] }
+        vSpinnerFps.config(FPS_DESCRITPTIONS, FPS_CHOICES.indexOf(fps)) { i -> fps = FPS_CHOICES[i] }
+        
+        vSwitchCommand.isChecked = isCommand
         vSwitchCommand.setOnCheckedChangeListener { _, isChecked -> isCommand = isChecked }
+    
+    
+        vSwitchCamera.isChecked = isCamera
         vSwitchCamera.setOnCheckedChangeListener { _, isChecked ->
             isCamera = isChecked
             
             vSpinnerFps.visibility = if(isCamera) View.VISIBLE else View.GONE
         }
+    
+        vSwitchGate.isChecked = isGate
         vSwitchGate.setOnCheckedChangeListener { _, isChecked ->
             isGate = isChecked
             if(isGate) {
@@ -65,6 +73,25 @@ class ConfigData(val deviceName:String) {
             accumulate("isGate", isGate)
             accumulate("fps", fps)
         }.toString())
+    }
+    
+    fun setView(viewDevice: ViewDevice, context: Context, desc:String) {
+        viewDevice.vTitle.text = deviceName
+        viewDevice.vSettings.setOnClickListener {
+            createRoot(context).setOnCancelListener {
+                updateView(viewDevice, desc)
+            }
+        }
+        updateView(viewDevice, desc)
+    }
+    
+    fun updateView(viewDevice: ViewDevice, desc:String) {
+        val has = mutableListOf<String>()
+        if(isCommand) has.add("command")
+        if(isCamera) has.add("camera")
+        if(isGate) has.add("gate")
+        
+        viewDevice.vDesc.text = "$desc ${has.joinToString("&")}"
     }
 
     override fun toString(): String {

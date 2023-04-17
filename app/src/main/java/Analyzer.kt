@@ -11,6 +11,7 @@ import java.io.FileOutputStream
 import java.lang.Integer.max
 import java.nio.IntBuffer
 import kotlin.concurrent.thread
+import kotlin.math.absoluteValue
 import kotlin.math.min
 
 
@@ -32,6 +33,7 @@ class Analyzer(context: Context, myCamera2: MyCamera2, val myTimer: MyTimer, val
 	var isHasStreakStarted = false
 	var streakMaxBroken = 0
 	val onStreakStartedListeners = mutableListOf<(Long)->Unit>()
+	val onTriangulatedListeners = mutableListOf<(Long,Long)->Unit>()
 	
 	private val listenTo = ImageReader.OnImageAvailableListener {
 		val image = it.acquireLatestImage() ?: return@OnImageAvailableListener
@@ -162,13 +164,19 @@ class Analyzer(context: Context, myCamera2: MyCamera2, val myTimer: MyTimer, val
 					drawDiagram(yBroken)
 					
 					//  time
-					val frametimeAdj = myTimer.timeOfBoot + timesMs[i] - timeStart
+					val timeFrameMS = myTimer.timeOfBoot + timesMs[i] - timeStart
 					
 					val delta = yFirstBroken - yLastBroken
 					val deltaMS = timesMs[i] - timesMs[i-1]
 					val numDeltas = (HALF_HEIGHT - yFirstBroken) / delta.toDouble()
 					val adjustmentMs = (numDeltas * deltaMS).toLong()
-					val midtimeAdj = frametimeAdj + adjustmentMs
+					var timeTriangleMs = timeFrameMS + adjustmentMs
+					
+					if(numDeltas.absoluteValue >= 5) timeTriangleMs = 0
+					
+					thread {
+						for(x in onTriangulatedListeners) x(timeTriangleMs, timeFrameMS)
+					}
 					
 					println("delta = $delta\n" +
 						"deltaMS = $deltaMS\n" +
@@ -177,8 +185,8 @@ class Analyzer(context: Context, myCamera2: MyCamera2, val myTimer: MyTimer, val
 					
 					bitmap.copyPixelsFromBuffer(IntBuffer.wrap(newBuffer))
 					val file = File("${Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DCIM)}/${Globals.DIR_NAME}/$session/" +
-							"image_triangletime-${midtimeAdj/1000}-${String.format("%03d", midtimeAdj%1000)}-s" +
-							"_frame-${i}_frametime-${frametimeAdj/1000}-${String.format("%03d", frametimeAdj%1000)}-s.jpg")
+							"image_triangletime-${timeTriangleMs/1000}-${String.format("%03d", timeTriangleMs%1000)}-s" +
+							"_frame-${i}_frametime-${timeFrameMS/1000}-${String.format("%03d", timeFrameMS%1000)}-s.jpg")
 					FileOutputStream(file).use { out ->
 						val matrix = Matrix()
 						matrix.postRotate(90f)
@@ -212,7 +220,7 @@ class Analyzer(context: Context, myCamera2: MyCamera2, val myTimer: MyTimer, val
 		isBroken.add(false)
 		numBroken.add(0)
 		
-		if(numBuffered > 15) {
+		if(numBuffered > 10) {
 			println("BUFFER OVERRUN")
 			isWant = false
 		}

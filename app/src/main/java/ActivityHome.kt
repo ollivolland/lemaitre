@@ -5,7 +5,6 @@ import MyTimer
 import ViewDevice
 import android.annotation.SuppressLint
 import android.os.Bundle
-import android.os.SystemClock
 import android.view.View
 import android.widget.Button
 import android.widget.LinearLayout
@@ -15,6 +14,7 @@ import datas.ClientData
 import datas.ConfigData
 import datas.HostData
 import datas.StartData
+import org.json.JSONObject
 import wakelock.MyWakeLock
 import java.util.*
 import kotlin.concurrent.thread
@@ -23,12 +23,14 @@ class ActivityHome : AppCompatActivity() {
     lateinit var vLogger: TextView
     lateinit var vFeedback: TextView
     private val logs:MutableList<String> = mutableListOf()
+    private val feedbacks:MutableList<String> = mutableListOf()
     var isRunning = true
     var sentLastUpdate = 0L
     private val wakeLock = MyWakeLock()
     private lateinit var viewGlobal:ViewDevice
     private lateinit var viewConfigMe:ViewDevice
     private lateinit var viewConfigClients:Array<ViewDevice>
+    val hasLaunched = mutableListOf<Long>()
 
     @SuppressLint("MissingPermission")
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -55,6 +57,8 @@ class ActivityHome : AppCompatActivity() {
                         if (it.startsWith("update=")) data.lastUpdate[i] = it.removePrefix("update=").toLong()
                     } catch (_:Exception) {}
                 }
+    
+                Session.receiveFeedback(data.mySockets[i]) { receiveFeedback(it, false) }
             }
 
             //  ui
@@ -83,19 +87,38 @@ class ActivityHome : AppCompatActivity() {
             tryUpdateViewGlobal()
     
             viewConfigMe = ViewDevice(this, vConfig)
-            configMe.setView(viewConfigMe, this, "host")
+            viewConfigMe.vTitle.text = configMe.deviceName
+            viewConfigMe.vSettings.setOnClickListener {
+                configMe.dialog(this).setOnCancelListener {
+                    configMe.updateView(viewConfigMe, "host")
+                }
+            }
+            configMe.updateView(viewConfigMe, "host")
     
             viewConfigClients = Array(configClients.size) { ViewDevice(this, vConfig) }
+            viewConfigClients.indices.forEach { configClients[it].updateView(viewConfigClients[it], "client") }
 
             //  dialogs
             var iClient = 0
             var dialogClient:()->Unit={}
             dialogClient = {
                 if(iClient < configClients.size) {
-                    configClients[iClient].createRoot(this).setOnCancelListener {
-                        configClients[iClient].setView(viewConfigClients[iClient], this, "client")
-                        configClients[iClient].send(data.mySockets[iClient])
-                        log("sent config ${configClients[iClient]}")
+                    val config = configClients[iClient]
+                    val view = viewConfigClients[iClient]
+                    val socket = data.mySockets[iClient]
+                    
+                    config.dialog(this).setOnCancelListener {
+                        view.vTitle.text = config.deviceName
+                        view.vSettings.setOnClickListener {
+                            config.dialog(this).setOnCancelListener {
+                                config.updateView(view, "client")
+                                config.send(socket)
+                                log("sent config $config")
+                            }
+                        }
+                        config.updateView(view, "client")
+                        config.send(socket)
+                        log("sent config $config")
                         
                         iClient++
                         dialogClient()
@@ -106,7 +129,7 @@ class ActivityHome : AppCompatActivity() {
                 tryUpdateViewGlobal()
     
                 Session.currentConfig = configMe
-                configMe.createRoot(this).setOnCancelListener {
+                configMe.dialog(this).setOnCancelListener {
                     configMe.updateView(viewConfigMe, "host")
                     
                     dialogClient()
@@ -128,16 +151,19 @@ class ActivityHome : AppCompatActivity() {
                     Session.starts.add(cfg)
                 }
             }
+            if(data.mySocket != null)
+                Session.receiveFeedback(data.mySocket!!) { receiveFeedback(it, false) }
         }
 
         //  misc
         GpsTime.register(this)
         wakeLock.acquire(this)
+//        receiveFeedback("test ${Session.state}", true)
 
         //  blinker
         thread {
             while (isRunning) {
-                val should = if(MyTimer().time % 1000 < 200) View.VISIBLE else View.INVISIBLE
+                val should = if(MyTimer().time % 1000 <= 100) View.VISIBLE else View.INVISIBLE
                 if(vBlinker.visibility != should) runOnUiThread { vBlinker.visibility = should }
 
                 Thread.sleep(1)
@@ -150,10 +176,14 @@ class ActivityHome : AppCompatActivity() {
                 //  start starts
                 if(!ActivityStart.isBusy)
                     for (x in Session.starts)
-                        if(!x.isLaunched && x.timeStamp < MyTimer().time + TIME_START)
+                        if(!hasLaunched.contains(x.id) && x.timeStamp < MyTimer().time + TIME_START)
                         {
+                            hasLaunched.add(x.id)
                             ActivityStart.launch(this, x)
-                            log("do start = $x")
+                            receiveFeedback("started ${Globals.FORMAT_TIME.format(x.timeStamp)}\n", false)
+                            log("do $x")
+                            
+                            break
                         }
 
                 //  client update host
@@ -161,12 +191,14 @@ class ActivityHome : AppCompatActivity() {
                     ClientData.get!!.mySocket?.write("update=${MyTimer().time}")
 
                 //  feedback
-                var feedback = ""
-                feedback = if(Session.starts.any { !it.isLaunched }) {
-                    "will start at ${Globals.FORMAT_TIME.format(Session.starts.filter { !it.isLaunched }.minOf { it.timeStamp })}"
+                val feedback = if(Session.starts.any { !hasLaunched.contains(it.id) }) {
+                    val all = Session.starts.filter { !hasLaunched.contains(it.id) }
+                    
+                    if(all.isEmpty()) "will start at ${Globals.FORMAT_TIME.format(all.minOf { it.timeStamp })}"
+                    else "will start at ${Globals.FORMAT_TIME.format(all.minOf { it.timeStamp })} (+${all.size} others)"
                 } else "no start scheduled"
                 runOnUiThread {
-                    vFeedback.text = feedback
+                    vFeedback.text = "$feedback\n\n${feedbacks.reversed().joinToString("\n")}"
                 }
 
                 Thread.sleep(20)
@@ -181,22 +213,37 @@ class ActivityHome : AppCompatActivity() {
         wakeLock.release()
     }
     
-    fun tryUpdateViewGlobal() {
+    private fun tryUpdateViewGlobal() {
         if(this::viewGlobal.isInitialized) {
             viewGlobal.vTitle.text = HostData.get.command
             viewGlobal.vDesc.text = "flavor:${HostData.get.flavor/1000}s length:${HostData.get.videoLength/1000}s Δ:+${HostData.get.delta/1000}s"
         }
     }
 
-//    fun getNetworkTime():Long {
-//        val timeClient = NTPUDPClient()
-//    }
-
-    fun log(string: String) {
+    private fun log(string: String) {
         println(string)
         logs.add(string)
         runOnUiThread {
             vLogger.text = logs.takeLast(20).reversed().joinToString("\n")
+        }
+    }
+    
+    fun receiveFeedback(string: String, isBroadCast:Boolean) {
+        feedbacks.add(string)
+        
+        if(!isBroadCast) return
+        
+        if(Session.state == SessionState.HOST) {
+            val data = HostData.get
+            
+            data.mySockets.forEach {
+                Session.sendFeedback(it, string)
+            }
+        }
+        else {
+            val data = ClientData.get!!
+            
+            if(data.mySocket != null) Session.sendFeedback(data.mySocket!!, string)
         }
     }
 

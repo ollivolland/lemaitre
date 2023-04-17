@@ -76,8 +76,10 @@ class MyClientThread(private val inetAddress: String, port: Int): MySocket(port,
 
                     if (length > 0) {
                         val s = String(buffer, 0, length)
-
-                        for (x in myOnReadListeners) x(s)
+    
+                        for (x in myOnReadListeners)
+                            try { x(s) }
+                            catch (e:Exception) { e.printStackTrace() }
                     }
                 } catch (e:Exception) {
                     e.printStackTrace()
@@ -114,7 +116,9 @@ class MyServerThread(port:Int): MySocket(port, "server") {
                     if (length > 0) {
                         val s = String(buffer, 0, length)
 
-                        for (x in myOnReadListeners) x(s)
+                        for (x in myOnReadListeners)
+                            try { x(s) }
+                            catch (e:Exception) { e.printStackTrace() }
                     }
                 } catch (e:Exception) {
                     e.printStackTrace()

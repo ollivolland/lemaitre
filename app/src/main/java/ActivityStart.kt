@@ -2,7 +2,6 @@ package com.ollivolland.lemaitre2
 
 import Analyzer
 import MyTimer
-import android.content.Context
 import android.content.Intent
 import android.media.MediaPlayer
 import android.os.Bundle
@@ -13,7 +12,6 @@ import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
 import datas.StartData
 import mycamera2.MyCamera2
-import mycamera2.MyReader
 import mycamera2.MyRecorder
 import kotlin.concurrent.thread
 
@@ -61,8 +59,15 @@ class ActivityStart : AppCompatActivity() {
         if(start.config.isGate) {
             analyzer = Analyzer(this, myCamera2, timer, start.timeStamp + start.timeToStart)
             analyzer.onStreakStartedListeners.add {
-                runOnUiThread { vLog.text = "${vLog.text}\ngate: ${it/1000}.${String.format("%03d", it%1000)} s" }
+                val msg = "gate: ${it/1000}.${String.format("%03d", it%1000)} s"
+                runOnUiThread { vLog.text = "${vLog.text}\n$msg" }
+//                sendFeedback?.invoke(msg, true)
             }
+            analyzer.onTriangulatedListeners.add{ tri, fra ->
+                val msg = "gate: ${tri/1000}.${String.format("%03d", tri%1000)}s   (~${fra/1000}.${String.format("%03d", fra%1000)}s)"
+                sendFeedback?.invoke(msg, true)
+            }
+            
             vGateLine.visibility = View.VISIBLE
             isGateStarted = false
             isGateStopped = false
@@ -140,16 +145,17 @@ class ActivityStart : AppCompatActivity() {
         const val DURATION_VIDEO_BEFORE_START = 3000L
 
         var startData: StartData? = null;private set
+        var sendFeedback:((String, Boolean)->Unit)? = null;private set
         var isBusy = false;private set
 
-        fun launch(context: Context, startData: StartData) {
+        fun launch(activityHome: ActivityHome, startData: StartData) {
             if(isBusy) return
 
             isBusy = true
             this.startData = startData
+            this.sendFeedback = { s,b -> activityHome.receiveFeedback(s,b) }
 
-            startData.isLaunched = true
-            context.startActivity(Intent(context, ActivityStart::class.java))
+            activityHome.startActivity(Intent(activityHome, ActivityStart::class.java))
         }
     }
 }

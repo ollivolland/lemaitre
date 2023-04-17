@@ -8,7 +8,6 @@ import org.json.JSONObject
 
 data class StartData(val id:Long, val timeStamp:Long, val timeToStart: Long, val videoLength: Long, val mpStartsBuild:String, val mpIdsBuild:String) {
     val config: ConfigData = Session.currentConfig.copy()
-    var isLaunched = false
 
     fun send(mySocket: MySocket) {
         mySocket.write(JSONObject().apply {
@@ -25,7 +24,7 @@ data class StartData(val id:Long, val timeStamp:Long, val timeToStart: Long, val
     val mpIds:Array<Int> get() = mpIdsBuild.split(",").map { it.toInt() }.toTypedArray()
 
     override fun toString(): String {
-        return "id=$id, timestamp=$timeStamp, isLaunched=$isLaunched"
+        return "id=$id, timestamp=$timeStamp"
     }
 
     companion object {

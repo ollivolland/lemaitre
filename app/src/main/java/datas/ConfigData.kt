@@ -18,7 +18,7 @@ class ConfigData(val deviceName:String) {
     var isCamera = false;private set
     var isCommand = false;private set
 
-    fun createRoot(context: Context):Dialog {
+    fun dialog(context: Context):Dialog {
         val d = Dialog(context)
         d.setContentView(R.layout.dialog_config)
 
@@ -73,16 +73,6 @@ class ConfigData(val deviceName:String) {
             accumulate("isGate", isGate)
             accumulate("fps", fps)
         }.toString())
-    }
-    
-    fun setView(viewDevice: ViewDevice, context: Context, desc:String) {
-        viewDevice.vTitle.text = deviceName
-        viewDevice.vSettings.setOnClickListener {
-            createRoot(context).setOnCancelListener {
-                updateView(viewDevice, desc)
-            }
-        }
-        updateView(viewDevice, desc)
     }
     
     fun updateView(viewDevice: ViewDevice, desc:String) {

@@ -206,7 +206,7 @@ class MainActivity : AppCompatActivity() {
 
             //  sockets
             checkNeedAnotherSocket()
-            if(Session.state ==  SessionState.CLIENT && !this::mySocketFormation.isInitialized) {
+            if(Session.state ==  SessionState.CLIENT && !this::mySocketFormation.isInitialized && info.groupOwnerAddress.hostAddress != null) {
                 mySocketFormation = MyClientThread(info.groupOwnerAddress.hostAddress!!, PORT_FORMATION).apply {
                     addOnRead { s ->
                         val jo = JSONObject(s)

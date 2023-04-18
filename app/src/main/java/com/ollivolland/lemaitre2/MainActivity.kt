@@ -31,6 +31,7 @@ import datas.HostData
 import org.json.JSONObject
 import kotlin.concurrent.thread
 
+
 class MainActivity : AppCompatActivity() {
     var thisDeviceName: String = ""
     private val manager: WifiP2pManager by lazy { getSystemService(Context.WIFI_P2P_SERVICE) as WifiP2pManager }
@@ -47,7 +48,6 @@ class MainActivity : AppCompatActivity() {
     var checkNeedAnotherSocket:() -> Unit ={}
     
     //  urgent
-    //  todo    manual connection from client
     //  todo    schedule
     //  todo    connection info
     //  todo    video timestamp
@@ -172,12 +172,12 @@ class MainActivity : AppCompatActivity() {
                         }.toString())
                     }
                     addOnRead { s ->
-                        toast(s)
                         val jo = JSONObject(s)
 
                         if (jo.has("name")) {
                             val client = Client(ip, port, jo["name"] as String)
                             clients.add(client)
+                            toast("connected ${client.name}")
                             log("client ${client.name} on [$port] => $ip")
 
                             this.close()
@@ -209,7 +209,6 @@ class MainActivity : AppCompatActivity() {
             if(Session.state ==  SessionState.CLIENT && !this::mySocketFormation.isInitialized) {
                 mySocketFormation = MyClientThread(info.groupOwnerAddress.hostAddress!!, PORT_FORMATION).apply {
                     addOnRead { s ->
-                        toast(s)
                         val jo = JSONObject(s)
 
                         if(jo.has("useport")) {
@@ -220,6 +219,7 @@ class MainActivity : AppCompatActivity() {
 
                             ClientData.set(jo["useport"] as Int, hostMac, this@MainActivity)
                             log("host = ${ClientData.get!!.port}")
+                            toast("connected to host")
                         }
                     }
                     log{ s -> this@MainActivity.log(s) }
@@ -355,8 +355,6 @@ class MainActivity : AppCompatActivity() {
         const val PORT_FORMATION = 8888
         const val PORT_COMMUNICATION = 8900 //  +10
         const val SERVICE_NAME = "_ollivollandlemaitre"
-//        const val SERVICE_TYPE = "_http._tcp."
-//        const val SERVICE_TYPE = "_services._dsn-sd._udp"
         const val SERVICE_TYPE = "_presence._tcp"
     }
 }

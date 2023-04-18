@@ -22,7 +22,6 @@
             android:layout_height="100dp"
             android:text="Host"
             android:textSize="10sp"
-            android:src="@drawable/ic_launcher_foreground"
             />
 
         <Button
@@ -32,7 +31,6 @@
             android:layout_marginStart="50dp"
             android:textSize="10sp"
             android:text="Client"
-            android:src="@drawable/ic_launcher_foreground"
             />
 
     </LinearLayout>
@@ -49,6 +47,7 @@
         android:id="@+id/logger"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
+        android:layout_marginTop="20dp"
         android:padding="20dp"
         android:text="Hello World!"
         android:textSize="10sp"

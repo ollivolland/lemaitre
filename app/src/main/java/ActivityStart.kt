@@ -129,8 +129,7 @@ class ActivityStart : AppCompatActivity() {
                 }
                 if(!isGateStopped && timer.time >= start.timeOfInit + start.timeToCommand + start.videoLength) {
                     isGateStopped = true
-                    analyzer.isWant = false
-                    analyzer.postProcessing()
+                    analyzer.stop()
                     
                     runOnUiThread { vLog.text = "${vLog.text}\ngate stopped" }
                 }

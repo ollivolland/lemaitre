@@ -20,11 +20,12 @@ class Analyzer(context: Context, myCamera2: MyCamera2, private val myTimer: MyTi
 	var index = 0
 	var isWant = false
 	private val session = Globals.FORMAT_TIME_FILE.format(myTimer.time)!!
+	private val day = Globals.FORMAT_DAY_FILE.format(myTimer.time)!!
 	var c1=0;var c2=0
 	var r=0;var g=0; var b=0
 	var numThisBroken = 0
 	var numBuffered = 0
-	var bitmap: Bitmap = Bitmap.createBitmap(1920, 1080, Bitmap.Config.ARGB_8888)
+	var bitmap: Bitmap = Bitmap.createBitmap(WIDTH, HEIGHT, Bitmap.Config.ARGB_8888)
 	private val buffers = mutableListOf<IntBuffer?>()
 	private val isBroken = mutableListOf<Boolean>()
 	private val timesMs = mutableListOf<Long>()
@@ -86,10 +87,13 @@ class Analyzer(context: Context, myCamera2: MyCamera2, private val myTimer: MyTi
 	val myReader: MyReader = myCamera2.addReader(MyReader.ReaderProfileBuilder(), listenTo)
 	
 	init {
-		File("${Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DCIM)}/${Globals.DIR_NAME}/$session").mkdirs()
+		File("${Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DCIM)}/${Globals.DIR_NAME}/$day/$session").mkdirs()
 	}
 	
-	fun postProcessing() {
+	fun stop() {
+		isWant = true
+		bitmap.recycle()
+
 		thread {
 			for (i in buffers.indices)
 				if(i < buffers.size - 3 && buffers[i] != null && i > 2 && buffers[i-1] != null && buffers[i-2] != null) {
@@ -176,22 +180,26 @@ class Analyzer(context: Context, myCamera2: MyCamera2, private val myTimer: MyTi
 						"deltaMS = $deltaMS\n" +
 						"numDeltas = $numDeltas\n" +
 						"adjustmentMs = $adjustmentMs")
-					
-					bitmap.copyPixelsFromBuffer(IntBuffer.wrap(newBuffer))
-					val file = File("${Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DCIM)}/${Globals.DIR_NAME}/$session/" +
+
+					val bmp = Bitmap.createBitmap(WIDTH, HEIGHT, Bitmap.Config.ARGB_8888)
+					bmp.copyPixelsFromBuffer(IntBuffer.wrap(newBuffer))
+					val matrix = Matrix()
+					matrix.postRotate(90f)
+					val rotatedBitmap = Bitmap.createBitmap(bmp, 0, 0, bmp.width, bmp.height, matrix, false)
+
+					val file = File("${Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DCIM)}/${Globals.DIR_NAME}/$day/$session/" +
 							"image_triangletime-${timeTriangleMs/1000}-${String.format("%03d", timeTriangleMs%1000)}-s" +
 							"_frame-${i}_frametime-${timeFrameMS/1000}-${String.format("%03d", timeFrameMS%1000)}-s.jpg")
 					FileOutputStream(file).use { out ->
-						val matrix = Matrix()
-						matrix.postRotate(90f)
-						val rotatedBitmap = Bitmap.createBitmap(bitmap, 0, 0, bitmap.width, bitmap.height, matrix, false)
 						rotatedBitmap.compress(Bitmap.CompressFormat.JPEG, 100, out)   //  jpg is faster
 						rotatedBitmap.recycle()
+						bmp.recycle()
 						out.flush()
 					}
+
+					//	release buffer
 				}
-			
-			bitmap.recycle()
+
 			for (i in buffers.indices)
 				buffers[i] = null
 		}

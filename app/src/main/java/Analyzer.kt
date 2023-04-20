@@ -15,11 +15,11 @@ import kotlin.math.absoluteValue
 import kotlin.math.min
 
 
-class Analyzer(context: Context, myCamera2: MyCamera2, val myTimer: MyTimer, val timeStart:Long) {
+class Analyzer(context: Context, myCamera2: MyCamera2, private val myTimer: MyTimer, private val timeStart:Long) {
     private val yuvToRgbConverter = YuvToRgbConverter(context)
 	var index = 0
 	var isWant = false
-	val session = Globals.FORMAT_TIME_FILE.format(myTimer.time)
+	private val session = Globals.FORMAT_TIME_FILE.format(myTimer.time)!!
 	var c1=0;var c2=0
 	var r=0;var g=0; var b=0
 	var numThisBroken = 0
@@ -45,8 +45,6 @@ class Analyzer(context: Context, myCamera2: MyCamera2, val myTimer: MyTimer, val
 			
 			if(index >= 2) {
 				isBroken[index] = isBrokenAtLine(index, index-1, HALF_HEIGHT)
-						|| isBrokenAtLine(index, index-1, HALF_HEIGHT - MULTILINE_DIFF)
-						|| isBrokenAtLine(index, index-1, HALF_HEIGHT + MULTILINE_DIFF)
 				numBroken[index] = numThisBroken
 				
 				if(!isHasStreakStarted && isBroken[index]) {
@@ -135,10 +133,6 @@ class Analyzer(context: Context, myCamera2: MyCamera2, val myTimer: MyTimer, val
 					
 					//  mid
 					yIndex = HALF_HEIGHT*WIDTH
-					for (x in 0 until WIDTH) newBuffer[yIndex+x] = colorMid
-					yIndex = (HALF_HEIGHT-MULTILINE_DIFF)*WIDTH
-					for (x in 0 until WIDTH) newBuffer[yIndex+x] = colorMid
-					yIndex = (HALF_HEIGHT+MULTILINE_DIFF)*WIDTH
 					for (x in 0 until WIDTH) newBuffer[yIndex+x] = colorMid
 					
 					var yFirstBroken = 0
@@ -252,10 +246,9 @@ class Analyzer(context: Context, myCamera2: MyCamera2, val myTimer: MyTimer, val
 		const val HEIGHT = 1080
 		const val SENSITIVITY = 1097 //  195075 * p^2
 		const val HALF_HEIGHT = HEIGHT/2
-		const val MIN_LINE_BROKEN_FOR_REGISTER = (WIDTH * .1).toInt()
+		const val MIN_LINE_BROKEN_FOR_REGISTER = (WIDTH * .15).toInt()
 		const val IMG_SKIP_MIN = .1
 		const val NANO_OVER_MILLI = 1E6.toLong()
 		const val FACTOR_MIN_BROKEN_FOR_BODY = .7
-		const val MULTILINE_DIFF = 100
 	}
 }

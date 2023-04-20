@@ -14,7 +14,6 @@ import datas.ClientData
 import datas.ConfigData
 import datas.HostData
 import datas.StartData
-import org.json.JSONObject
 import wakelock.MyWakeLock
 import java.util.*
 import kotlin.concurrent.thread
@@ -47,6 +46,7 @@ class ActivityHome : AppCompatActivity() {
         if(Session.state == SessionState.HOST) {
             val data = HostData.get
             val configMe = ConfigData(data.hostName)
+            configMe.setAsHost()
             val configClients = Array(data.clients.size) { i -> ConfigData(data.clients[i].name) }
 
             //  update
@@ -158,7 +158,6 @@ class ActivityHome : AppCompatActivity() {
         //  misc
         GpsTime.register(this)
         wakeLock.acquire(this)
-//        receiveFeedback("test ${Session.state}", true)
 
         //  blinker
         thread {
@@ -176,11 +175,11 @@ class ActivityHome : AppCompatActivity() {
                 //  start starts
                 if(!ActivityStart.isBusy)
                     for (x in Session.starts)
-                        if(!hasLaunched.contains(x.id) && x.timeStamp < MyTimer().time + TIME_START)
+                        if(!hasLaunched.contains(x.id) && x.timeOfInit < MyTimer().time + TIME_START)
                         {
                             hasLaunched.add(x.id)
                             ActivityStart.launch(this, x)
-                            receiveFeedback("started ${Globals.FORMAT_TIME.format(x.timeStamp)}\n", false)
+                            receiveFeedback("started ${Globals.FORMAT_TIME.format(x.timeOfInit)}\n", false)
                             log("do $x")
                             
                             break
@@ -194,8 +193,8 @@ class ActivityHome : AppCompatActivity() {
                 val feedback = if(Session.starts.any { !hasLaunched.contains(it.id) }) {
                     val all = Session.starts.filter { !hasLaunched.contains(it.id) }
                     
-                    if(all.isEmpty()) "will start at ${Globals.FORMAT_TIME.format(all.minOf { it.timeStamp })}"
-                    else "will start at ${Globals.FORMAT_TIME.format(all.minOf { it.timeStamp })} (+${all.size} others)"
+                    if(all.isEmpty()) "will start at ${Globals.FORMAT_TIME.format(all.minOf { it.timeOfInit })}"
+                    else "will start at ${Globals.FORMAT_TIME.format(all.minOf { it.timeOfInit })} (+${all.size} others)"
                 } else "no start scheduled"
                 runOnUiThread {
                     vFeedback.text = "$feedback\n\n${feedbacks.reversed().joinToString("\n")}"

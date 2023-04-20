@@ -62,7 +62,8 @@ class MainActivity : AppCompatActivity() {
     //  todo    firebase crash reporter
     //  todo    net time
     //  todo    wifip2p class
-    
+    //  todo    audioTrack instead of MediaPlayer
+
     //  BUGS
     //  todo    feedback bug
 

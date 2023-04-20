@@ -57,7 +57,7 @@ class ActivityStart : AppCompatActivity() {
         
         //  Gate
         if(start.config.isGate) {
-            analyzer = Analyzer(this, myCamera2, timer, start.timeStamp + start.timeToStart)
+            analyzer = Analyzer(this, myCamera2, timer, start.timeOfInit + start.timeToCommand)
             analyzer.onStreakStartedListeners.add {
                 val msg = "gate: ${it/1000}.${String.format("%03d", it%1000)} s"
                 runOnUiThread { vLog.text = "${vLog.text}\n$msg" }
@@ -81,9 +81,16 @@ class ActivityStart : AppCompatActivity() {
         //  mps
         if(start.config.isCommand) {
             mps.addAll(Array(start.mpIds.size) { i -> MediaPlayer.create(this, start.mpIds[i]) })
+            if(Session.state == SessionState.HOST) {
+                val duration = mps.last().duration
+                val audioShouldStartAtMs = start.mpStarts.last()
+                mps.last().setOnCompletionListener {
+                    val delta = timer.time - duration - audioShouldStartAtMs
+                    sendFeedback?.invoke("delay: $delta ms", false)
+                }
+            }
             mps.add(MediaPlayer.create(this, R.raw.whitenoise_point_001db)) //  needs to play non-silent audio for box
 
-//            thread {
             for (i in start.mpIds.indices) {
                 thread {
                     timer.lock(start.mpStarts[i])
@@ -97,16 +104,16 @@ class ActivityStart : AppCompatActivity() {
 
         thread {
             while (isBusy) {
-                if(timer.time >= start.timeStamp + start.timeToStart + start.videoLength + DURATION_WAIT_AFTER_FINISH) finish()
+                if(timer.time >= start.timeOfInit + start.timeToCommand + start.videoLength + DURATION_WAIT_AFTER_FINISH) finish()
                 
                 //  camera
-                if(!isCameraStarted && timer.time >= start.timeStamp + start.timeToStart - DURATION_VIDEO_BEFORE_START) {
+                if(!isCameraStarted && timer.time >= start.timeOfInit + start.timeToCommand - DURATION_VIDEO_BEFORE_START) {
                     isCameraStarted = true
                     myRecorder.startRecord()
                     
                     runOnUiThread { vLog.text = "${vLog.text}\nvideo started" }
                 }
-                if(!isCameraStopped && timer.time >= start.timeStamp + start.timeToStart + start.videoLength) {
+                if(!isCameraStopped && timer.time >= start.timeOfInit + start.timeToCommand + start.videoLength) {
                     isCameraStopped = true
                     myRecorder.stopRecord()
                     
@@ -114,13 +121,13 @@ class ActivityStart : AppCompatActivity() {
                 }
                 
                 //  gate
-                if(!isGateStarted && timer.time >= start.timeStamp + start.timeToStart) {
+                if(!isGateStarted && timer.time >= start.timeOfInit + start.timeToCommand) {
                     isGateStarted = true
                     analyzer.isWant = true
                     
                     runOnUiThread { vLog.text = "${vLog.text}\ngate started" }
                 }
-                if(!isGateStopped && timer.time >= start.timeStamp + start.timeToStart + start.videoLength) {
+                if(!isGateStopped && timer.time >= start.timeOfInit + start.timeToCommand + start.videoLength) {
                     isGateStopped = true
                     analyzer.isWant = false
                     analyzer.postProcessing()
@@ -153,7 +160,7 @@ class ActivityStart : AppCompatActivity() {
 
             isBusy = true
             this.startData = startData
-            this.sendFeedback = { s,b -> activityHome.receiveFeedback(s,b) }
+            this.sendFeedback = activityHome::receiveFeedback
 
             activityHome.startActivity(Intent(activityHome, ActivityStart::class.java))
         }

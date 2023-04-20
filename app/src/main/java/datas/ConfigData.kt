@@ -17,6 +17,7 @@ class ConfigData(val deviceName:String) {
     var isGate = false;private set
     var isCamera = false;private set
     var isCommand = false;private set
+    private var isHost = false
 
     fun dialog(context: Context):Dialog {
         val d = Dialog(context)
@@ -33,8 +34,8 @@ class ConfigData(val deviceName:String) {
         vSpinnerFps.config(FPS_DESCRITPTIONS, FPS_CHOICES.indexOf(fps)) { i -> fps = FPS_CHOICES[i] }
         
         vSwitchCommand.isChecked = isCommand
+        if(isHost) vSwitchCommand.isEnabled = false
         vSwitchCommand.setOnCheckedChangeListener { _, isChecked -> isCommand = isChecked }
-    
     
         vSwitchCamera.isChecked = isCamera
         vSwitchCamera.setOnCheckedChangeListener { _, isChecked ->
@@ -55,6 +56,11 @@ class ConfigData(val deviceName:String) {
 
         d.show()
         return d
+    }
+
+    fun setAsHost() {
+        isHost = true
+        isCommand = true
     }
 
     fun copy(): ConfigData {

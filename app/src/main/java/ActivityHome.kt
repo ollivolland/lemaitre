@@ -35,6 +35,7 @@ class ActivityHome : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_home)
+        println("HOME CREATED")
 
         vLogger = findViewById(R.id.home_tLogger)
         vFeedback = findViewById(R.id.home_tFeedback)

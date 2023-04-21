@@ -29,7 +29,8 @@ class ActivityHome : AppCompatActivity() {
     private lateinit var viewGlobal:ViewDevice
     private lateinit var viewConfigMe:ViewDevice
     private lateinit var viewConfigClients:Array<ViewDevice>
-    val hasLaunched = mutableListOf<Long>()
+    private val hasLaunched = mutableListOf<Long>()
+    private val socketListeners = mutableListOf<(String) -> Unit>()
 
     @SuppressLint("MissingPermission")
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -51,15 +52,8 @@ class ActivityHome : AppCompatActivity() {
             val configClients = Array(data.clients.size) { i -> ConfigData(data.clients[i].name) }
 
             //  update
-            for(i in data.mySockets.indices) {
-                //  possible reassignment before lambda call
-                data.mySockets[i].addOnRead {
-                    try {
-                        if (it.startsWith("update=")) data.lastUpdate[i] = it.removePrefix("update=").toLong()
-                    } catch (_:Exception) {}
-                }
-    
-                Session.receiveFeedback(data.mySockets[i]) { receiveFeedback(it, false) }
+            addSocketListener(data.mySockets) {
+                receiveFeedback(it, false)
             }
 
             //  ui
@@ -99,61 +93,68 @@ class ActivityHome : AppCompatActivity() {
             viewConfigClients = Array(configClients.size) { ViewDevice(this, vConfig) }
             viewConfigClients.indices.forEach { configClients[it].updateView(viewConfigClients[it], "client") }
 
-            //  dialogs
-            var iClient = 0
-            var dialogClient:()->Unit={}
-            dialogClient = {
-                if(iClient < configClients.size) {
-                    val config = configClients[iClient]
-                    val view = viewConfigClients[iClient]
-                    val socket = data.mySockets[iClient]
-                    
-                    config.dialog(this).setOnCancelListener {
-                        view.vTitle.text = config.deviceName
-                        view.vSettings.setOnClickListener {
-                            config.dialog(this).setOnCancelListener {
-                                config.updateView(view, "client")
-                                config.send(socket)
-                                log("sent config $config")
+            if(!data.isinit) {
+                //  dialogs
+                var iClient = 0
+                var dialogClient: () -> Unit = {}
+                dialogClient = {
+                    if (iClient < configClients.size) {
+                        val config = configClients[iClient]
+                        val view = viewConfigClients[iClient]
+                        val socket = data.mySockets[iClient]
+
+                        config.dialog(this).setOnCancelListener {
+                            view.vTitle.text = config.deviceName
+                            view.vSettings.setOnClickListener {
+                                config.dialog(this).setOnCancelListener {
+                                    config.updateView(view, "client")
+                                    config.send(socket)
+                                    log("sent config $config")
+                                }
                             }
+                            config.updateView(view, "client")
+                            config.send(socket)
+                            log("sent config $config")
+
+                            iClient++
+                            dialogClient()
                         }
-                        config.updateView(view, "client")
-                        config.send(socket)
-                        log("sent config $config")
-                        
-                        iClient++
+                    }
+                }
+                HostData.createRoot(this).setOnCancelListener {
+                    tryUpdateViewGlobal()
+
+                    Session.currentConfig = configMe
+                    configMe.dialog(this).setOnCancelListener {
+                        configMe.updateView(viewConfigMe, "host")
+
                         dialogClient()
                     }
                 }
             }
-            HostData.createRoot(this).setOnCancelListener {
-                tryUpdateViewGlobal()
-    
-                Session.currentConfig = configMe
-                configMe.dialog(this).setOnCancelListener {
-                    configMe.updateView(viewConfigMe, "host")
-                    
-                    dialogClient()
-                }
-            }
+
+            //  post
+            data.tryInit()
         }
 
         //  *****   CLIENT
         else {
             val data = ClientData.get!!
 
-            data.mySocket?.addOnRead {
-                ConfigData.tryReceive(data.deviceName, it) { cfg ->
-                    log("received config = $cfg")
-                    Session.currentConfig = cfg
-                }
-                StartData.tryReceive(it) { cfg ->
-                    log("received start = $cfg")
-                    Session.starts.add(cfg)
+            if(data.mySocket != null)
+            {
+                addSocketListener(arrayOf(data.mySocket!!)) {
+                    ConfigData.tryReceive(data.deviceName, it) { cfg ->
+                        log("received config = $cfg")
+                        Session.currentConfig = cfg
+                    }
+                    StartData.tryReceive(it) { cfg ->
+                        log("received start = $cfg")
+                        Session.starts.add(cfg)
+                    }
+                    Session.tryReceive(it) { msg -> receiveFeedback(msg, false) }
                 }
             }
-            if(data.mySocket != null)
-                Session.receiveFeedback(data.mySocket!!) { receiveFeedback(it, false) }
         }
 
         //  misc
@@ -211,6 +212,20 @@ class ActivityHome : AppCompatActivity() {
         isRunning = false
         GpsTime.unregister()
         wakeLock.release()
+
+        if(Session.state == SessionState.HOST) {
+            val data = HostData.get
+
+            for (x in data.mySockets)
+                for (y in socketListeners)
+                    x.removeOnRead(y)
+        }
+        else {
+            val data = ClientData.get!!
+
+            for (y in socketListeners)
+                data.mySocket?.removeOnRead(y)
+        }
     }
     
     private fun tryUpdateViewGlobal() {
@@ -218,6 +233,12 @@ class ActivityHome : AppCompatActivity() {
             viewGlobal.vTitle.text = HostData.get.command
             viewGlobal.vDesc.text = "flavor:${HostData.get.flavor/1000}s length:${HostData.get.videoLength/1000}s Δ:+${HostData.get.delta/1000}s"
         }
+    }
+
+    private fun addSocketListener(sockets: Array<MySocket>, action:(String) -> Unit) {
+        socketListeners.add(action)
+        for (x in sockets)
+            x.addOnRead(action)
     }
 
     private fun log(string: String) {

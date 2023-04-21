@@ -13,7 +13,7 @@ abstract class MySocket(private val port: Int, private val type:String) {
     private val executor: ExecutorService = Executors.newSingleThreadExecutor()
     protected val myOnSocketListener = mutableListOf<(Socket) -> Unit>()
     protected val myOnCloseListeners = mutableListOf<() -> Unit>()
-    protected val myOnReadListeners = mutableListOf<(String) -> Unit>()
+    val myOnReadListeners = mutableListOf<(String) -> Unit>()
     protected lateinit var mOutputStream: OutputStream
     protected lateinit var mInputStream: InputStream
     protected var isOpen = true
@@ -40,10 +40,6 @@ abstract class MySocket(private val port: Int, private val type:String) {
                 isOpen = false
             }
         }
-    }
-
-    fun writeTime(f:()->Long) {
-        executor.execute { mOutputStream.write("time=${f()}".encodeToByteArray()) }
     }
 
     fun close() {

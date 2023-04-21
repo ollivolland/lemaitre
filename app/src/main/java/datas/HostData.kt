@@ -17,9 +17,23 @@ class HostData private constructor(val hostName:String, val clients: Array<Clien
     var flavor:Long = FLAVOR_CHOICES[0]
     var delta:Long = DELTA_CHOICES[0]
     var videoLength:Long = DURATION_CHOICES[0]
+    var isinit = false
 
     init {
         for (x in mySockets) x.write("fin")
+    }
+
+    fun tryInit() {
+        if(!isinit) return
+
+        for (i in mySockets.indices)
+            mySockets[i].addOnRead {
+                try {
+                    if (it.startsWith("update=")) lastUpdate[i] = it.removePrefix("update=").toLong()
+                }
+                catch (_:Exception) {}
+            }
+        isinit = true
     }
 
     companion object {

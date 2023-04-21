@@ -1,20 +1,15 @@
 import android.content.Context
 import android.graphics.Bitmap
-import android.graphics.ImageFormat
 import android.graphics.Matrix
 import android.media.Image
 import android.media.ImageReader
 import android.os.Environment
-import android.renderscript.Allocation
-import android.renderscript.Element
-import android.renderscript.RenderScript
-import android.renderscript.ScriptIntrinsicYuvToRGB
 import mycamera2.MyCamera2
 import mycamera2.MyReader
+import mycamera2.MyYubToRgb
 import java.io.File
 import java.io.FileOutputStream
 import java.lang.Integer.max
-import java.nio.ByteBuffer
 import java.nio.IntBuffer
 import kotlin.concurrent.thread
 import kotlin.math.absoluteValue
@@ -30,9 +25,7 @@ class Analyzer(private val context: Context, myCamera2: MyCamera2, private val m
 	var r=0;var g=0; var b=0
 	var numThisBroken = 0
 	var numBuffered = 0
-//	var bitmap: Bitmap = Bitmap.createBitmap(WIDTH, HEIGHT, Bitmap.Config.ARGB_8888)
-	private val bitmaps = mutableListOf<Bitmap?>()
-	private val buffers = mutableListOf<IntBuffer?>()
+	private val buffers = ArrayList<IntBuffer?>(61 * 30)
 	private val isBroken = mutableListOf<Boolean>()
 	private val timesMs = mutableListOf<Long>()
 	private val numBroken = mutableListOf<Int>()
@@ -47,13 +40,11 @@ class Analyzer(private val context: Context, myCamera2: MyCamera2, private val m
 
 		try {
 			if (isWant) {
-//				yuvToRgbConverter.yuvToRgb(image, bitmap)
-//				val bitmap: Bitmap = Bitmap.createBitmap(WIDTH, HEIGHT, Bitmap.Config.ARGB_8888)
 				addBuffer(image)
 				timesMs.add(image.timestamp / NANO_OVER_MILLI)
 
 				if (index >= 2) {
-					isBroken[index] = isBrokenAtLine(index, index - 1, HALF_HEIGHT)
+					isBroken[index] = isBrokenAtLine(index, index - 1)
 					numBroken[index] = numThisBroken
 
 					if (!isHasStreakStarted && isBroken[index] && needed.count { it > 0 } < MAX_IMAGES_CONCURRENT) {
@@ -79,7 +70,7 @@ class Analyzer(private val context: Context, myCamera2: MyCamera2, private val m
 
 					//  dealloc not needed
 					for (notNeeded in buffers.indices.filterNot { i ->
-						if (i >= index - 2) return@filterNot true
+						if (i >= index - 1) return@filterNot true	//	next will be added after loop
 
 						for (x in needed)
 							if (i <= x && i >= x - 2) return@filterNot true
@@ -88,7 +79,6 @@ class Analyzer(private val context: Context, myCamera2: MyCamera2, private val m
 					}) clearBuffer(notNeeded)
 				}
 				index++
-//				bitmap.recycle()
 			}
 		} catch (e:Exception) { e.printStackTrace() }
 		
@@ -96,123 +86,11 @@ class Analyzer(private val context: Context, myCamera2: MyCamera2, private val m
 	}
 	val myReader: MyReader = myCamera2.addReader(MyReader.ReaderProfileBuilder(), listenTo)
 
-//	fun decodeYUV420SP(yuv420sp: ByteArray):IntArray {	//	BROKEN
-//		val frameSize = WIDTH * HEIGHT
-//		val rgba = IntArray(frameSize * 4)
-//		var j = 0; var yp = 0; var u = 0; var v = 0; var i = 0
-//		var r: Int;var b: Int;var g: Int
-//		var y: Int; var uvp: Int; var y1192: Int
-//		while (j < HEIGHT) {
-//			uvp = frameSize + (j shr 1) * WIDTH
-//			while (i < WIDTH) {
-//				y = (0xff and yuv420sp[yp].toInt()) - 16
-//				if (y < 0) y = 0
-//				if (i and 1 == 0) {
-//					v = (0xff and yuv420sp[uvp++].toInt()) - 128
-//					u = (0xff and yuv420sp[uvp++].toInt()) - 128
-//				}
-//				y1192 = 1192 * y
-//				r = y1192 + 1634 * v
-//				g = y1192 - 833 * v - 400 * u
-//				b = y1192 + 2066 * u
-//				if (r < 0) r = 0 else if (r > 262143) r = 262143
-//				if (g < 0) g = 0 else if (g > 262143) g = 262143
-//				if (b < 0) b = 0 else if (b > 262143) b = 262143
-//
-//				// rgb[yp] = 0xff000000 | ((r << 6) & 0xff0000) | ((g >> 2) &
-//				// 0xff00) | ((b >> 10) & 0xff);
-//				// rgba, divide 2^10 ( >> 10)
-//				rgba[yp] = (r shl 14 and (-0x1000000) or (g shl 6 and 0xff0000)
-//						or (b shr 2 or 0xff00))
-//				i++
-//				yp++
-//			}
-//			j++
-//		}
-//		return  rgba
-//	}
-
-	fun yuvtorgb(image: Image, bitmap: Bitmap) {
-		val yuvBytes: ByteBuffer = imageToByteBuffer(image)
-
-		// Convert YUV to RGB
-		val rs = RenderScript.create(context)
-		val allocationRgb = Allocation.createFromBitmap(rs, bitmap)
-		val allocationYuv = Allocation.createSized(rs, Element.U8(rs), yuvBytes.array().size)
-		allocationYuv.copyFrom(yuvBytes.array())
-
-		val scriptYuvToRgb = ScriptIntrinsicYuvToRGB.create(rs, Element.U8_4(rs))
-		scriptYuvToRgb.setInput(allocationYuv)
-		scriptYuvToRgb.forEach(allocationRgb)
-
-		//	back
-		allocationRgb.copyTo(bitmap)
-
-		// Release
-		allocationYuv.destroy()
-		allocationRgb.destroy()
-		rs.destroy()
-	}
-
-	private fun imageToByteBuffer(image: Image): ByteBuffer {
-		val crop = image.cropRect
-		val width = crop.width()
-		val height = crop.height()
-		val planes = image.planes
-		val rowData = ByteArray(planes[0].rowStride)
-		val bufferSize = width * height * ImageFormat.getBitsPerPixel(ImageFormat.YUV_420_888) / 8
-		val output = ByteBuffer.allocateDirect(bufferSize)
-		var channelOffset = 0
-		var outputStride = 0
-		for (planeIndex in 0..2) {
-			when (planeIndex) {
-				0 -> {
-					channelOffset = 0
-					outputStride = 1
-				}
-				1 -> {
-					channelOffset = width * height + 1
-					outputStride = 2
-				}
-				else -> {
-					channelOffset = width * height
-					outputStride = 2
-				}
-			}
-			val buffer = planes[planeIndex].buffer
-			val rowStride = planes[planeIndex].rowStride
-			val pixelStride = planes[planeIndex].pixelStride
-			val shift = if (planeIndex == 0) 0 else 1
-			val widthShifted = width shr shift
-			val heightShifted = height shr shift
-			buffer.position(rowStride * (crop.top shr shift) + pixelStride * (crop.left shr shift))
-			for (row in 0 until heightShifted) {
-				val length: Int
-				if (pixelStride == 1 && outputStride == 1) {
-					length = widthShifted
-					buffer[output.array(), channelOffset, length]
-					channelOffset += length
-				} else {
-					length = (widthShifted - 1) * pixelStride + 1
-					buffer[rowData, 0, length]
-					for (col in 0 until widthShifted) {
-						output.array()[channelOffset] = rowData[col * pixelStride]
-						channelOffset += outputStride
-					}
-				}
-				if (row < heightShifted - 1) {
-					buffer.position(buffer.position() + rowStride - length)
-				}
-			}
-		}
-		return output
-	}
-	
 	init {
 		File("${Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DCIM)}/${Globals.DIR_NAME}/$day/$session").mkdirs()
 	}
 
-	fun process(i: Int) {
+	private fun process(i: Int) {
 		if(i >= buffers.size || i < 2 || buffers[i] == null || buffers[i-1] == null || buffers[i-2] == null) return
 
 		println("needed ${needed.lastIndex}")
@@ -262,15 +140,15 @@ class Analyzer(private val context: Context, myCamera2: MyCamera2, private val m
 				for (x in 0 until WIDTH) newBuffer[yIndex + x] = colorMid
 
 				var yFirstBroken = 0
-				val drawDiagram: (IntArray) -> Unit = { useyBroken ->
+				val drawDiagram: (IntArray) -> Unit = { useYBroken ->
 					//  diagram
 					for (y in 1 until HEIGHT)
-						for (x in max(min(useyBroken[y - 1], useyBroken[y]) - 3, 0) until max(useyBroken[y - 1], useyBroken[y]))
+						for (x in max(min(useYBroken[y - 1], useYBroken[y]) - 3, 0) until max(useYBroken[y - 1], useYBroken[y]))
 							newBuffer[y * WIDTH + WIDTH - x] = colorIndicator
 					//  first broken
-					val thisFullMostBroken = useyBroken.max()
+					val thisFullMostBroken = useYBroken.max()
 					for (y in HEIGHT downTo 0)
-						if (useyBroken[y] > thisFullMostBroken * FACTOR_MIN_BROKEN_FOR_BODY) {
+						if (useYBroken[y] > thisFullMostBroken * FACTOR_MIN_BROKEN_FOR_BODY) {
 							yFirstBroken = y
 							break
 						}
@@ -300,9 +178,9 @@ class Analyzer(private val context: Context, myCamera2: MyCamera2, private val m
 
 				println(
 					"delta = $delta\n" +
-							"deltaMS = $deltaMS\n" +
-							"numDeltas = $numDeltas\n" +
-							"adjustmentMs = $adjustmentMs"
+					"deltaMS = $deltaMS\n" +
+					"numDeltas = $numDeltas\n" +
+					"adjustmentMs = $adjustmentMs"
 				)
 
 				val bmp = Bitmap.createBitmap(WIDTH, HEIGHT, Bitmap.Config.ARGB_8888)
@@ -340,21 +218,22 @@ class Analyzer(private val context: Context, myCamera2: MyCamera2, private val m
 
 		println("cleared buffer[$i]")
 		buffers[i] = null
-		bitmaps[i]?.recycle()
-		bitmaps[i] = null
 		numBuffered--
 	}
 	
 	private fun addBuffer(image: Image) {
 		val bitmap = Bitmap.createBitmap(WIDTH, HEIGHT, Bitmap.Config.ARGB_8888)
-		yuvtorgb(image, bitmap)
+		MyYubToRgb.yuvtorgb(image, bitmap, context)
 		val buffer = IntBuffer.allocate(bitmap.byteCount)
 		bitmap.copyPixelsToBuffer(buffer)
+		bitmap.recycle()
+		System.gc()
+
+//		val buffer = IntBuffer.wrap(MyYubToRgb.yuvtorgb(image))
 
 //		val array = decodeYUV420SP(imageToByteBuffer(image).array())
 //		val buffer = IntBuffer.wrap(array)
 
-		bitmaps.add(bitmap)
 		buffers.add(buffer)
 		numBuffered++
 		println("allocated buffer[$index] with ${buffers.last()?.capacity()}, $numBuffered")
@@ -363,9 +242,9 @@ class Analyzer(private val context: Context, myCamera2: MyCamera2, private val m
 		numBroken.add(0)
 	}
 	
-	private fun isBrokenAtLine(bmp1: Int, bmp2: Int, y:Int):Boolean {
+	private fun isBrokenAtLine(bmp1: Int, bmp2: Int):Boolean {
 		numThisBroken = 0
-		val yIndex = y * WIDTH
+		val yIndex = HALF_HEIGHT * WIDTH
 		
 		for (x in 0 until WIDTH)
 			if(isBroken(bmp1, bmp2, yIndex+x))

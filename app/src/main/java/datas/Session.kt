@@ -17,12 +17,11 @@ class Session {
             }.toString())
         }
         
-        fun receiveFeedback(mySocket: MySocket, action:(String)->Unit) {
-            mySocket.addOnRead {
-                if(!it.contains("\"key\":\"$KEY_FEEDBACK\"")) return@addOnRead
-                val jo = JSONObject(it)
-                
-                if(jo.has("msg")) action(jo["msg"].toString())
+        fun tryReceive(string: String, action:(String)->Unit) {
+            if(string.contains("\"key\":\"$KEY_FEEDBACK\"")) {
+                val jo = JSONObject(string)
+
+                if (jo.has("msg")) action(jo["msg"].toString())
             }
         }
         

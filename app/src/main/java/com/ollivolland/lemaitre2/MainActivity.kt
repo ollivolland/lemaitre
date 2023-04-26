@@ -48,6 +48,7 @@ class MainActivity : AppCompatActivity() {
     var checkNeedAnotherSocket:() -> Unit ={}
     
     //  urgent
+    //  TODO    VIDEO BROKEN, started 3 times filmed only once, ?did not crash
     //  todo    schedule
     //  todo    connection info
     //  todo    video timestamp

@@ -12,12 +12,15 @@ import com.ollivolland.lemaitre2.R
 import config
 import org.json.JSONObject
 
-class ConfigData(val deviceName:String) {
+class ConfigData(val deviceName:String, private val isHost:Boolean = false) {
     var fps = FPS_CHOICES[0];private set
     var isGate = false;private set
     var isCamera = false;private set
     var isCommand = false;private set
-    private var isHost = false
+    
+    init {
+    	if (isHost) isCommand = true
+    }
 
     fun dialog(context: Context):Dialog {
         val d = Dialog(context)
@@ -32,6 +35,7 @@ class ConfigData(val deviceName:String) {
         vTitle.text = deviceName
 
         vSpinnerFps.config(FPS_DESCRITPTIONS, FPS_CHOICES.indexOf(fps)) { i -> fps = FPS_CHOICES[i] }
+        vSpinnerFps.visibility = if(isCamera) View.VISIBLE else View.GONE
         
         vSwitchCommand.isChecked = isCommand
         if(isHost) vSwitchCommand.isEnabled = false
@@ -58,11 +62,6 @@ class ConfigData(val deviceName:String) {
         return d
     }
 
-    fun setAsHost() {
-        isHost = true
-        isCommand = true
-    }
-
     fun copy(): ConfigData {
         return ConfigData(deviceName).also { copy ->
             copy.fps = fps
@@ -72,22 +71,15 @@ class ConfigData(val deviceName:String) {
         }
     }
 
-    fun send(mySocket: MySocket) {
+    fun send(mySocket: MySocket, action: ((String) -> Unit)? = null) {
         mySocket.write(JSONObject().apply {
             accumulate("isCommand", isCommand)
             accumulate("isCamera", isCamera)
             accumulate("isGate", isGate)
             accumulate("fps", fps)
         }.toString())
-    }
-    
-    fun updateView(viewDevice: ViewDevice, desc:String) {
-        val has = mutableListOf<String>()
-        if(isCommand) has.add("command")
-        if(isCamera) has.add("camera")
-        if(isGate) has.add("gate")
         
-        viewDevice.vDesc.text = "$desc ${has.joinToString("&")}"
+        action?.invoke("sent config $this")
     }
 
     override fun toString(): String {

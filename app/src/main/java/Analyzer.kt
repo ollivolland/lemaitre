@@ -17,7 +17,7 @@ import kotlin.math.min
 
 
 class Analyzer(private val context: Context, myCamera2: MyCamera2, private val myTimer: MyTimer, private val timeStart:Long) {
-	var index = 0
+	private var index = 0
 	var isWant = false
 	private val session = Globals.FORMAT_TIME_FILE.format(myTimer.time)!!
 	private val day = Globals.FORMAT_DAY_FILE.format(myTimer.time)!!
@@ -229,11 +229,6 @@ class Analyzer(private val context: Context, myCamera2: MyCamera2, private val m
 		bitmap.recycle()
 		System.gc()
 
-//		val buffer = IntBuffer.wrap(MyYubToRgb.yuvtorgb(image))
-
-//		val array = decodeYUV420SP(imageToByteBuffer(image).array())
-//		val buffer = IntBuffer.wrap(array)
-
 		buffers.add(buffer)
 		numBuffered++
 		println("allocated buffer[$index] with ${buffers.last()?.capacity()}, $numBuffered")
@@ -264,8 +259,8 @@ class Analyzer(private val context: Context, myCamera2: MyCamera2, private val m
 	}
 	
 	companion object {
-		const val WIDTH = 1920
-		const val HEIGHT = 1080
+		const val WIDTH = 1280
+		const val HEIGHT = 720
 		const val SENSITIVITY = 1097 //  195075 * p^2
 		const val HALF_HEIGHT = HEIGHT/2
 		const val MIN_LINE_BROKEN_FOR_REGISTER = (WIDTH * .15).toInt()

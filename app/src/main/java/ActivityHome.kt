@@ -14,23 +14,25 @@ import datas.ClientData
 import datas.ConfigData
 import datas.HostData
 import datas.StartData
+import setString
 import wakelock.MyWakeLock
 import java.util.*
 import kotlin.concurrent.thread
 
 class ActivityHome : AppCompatActivity() {
-    lateinit var vLogger: TextView
-    lateinit var vFeedback: TextView
+    private lateinit var vLogger: TextView
+    private lateinit var vFeedback: TextView
     private val logs:MutableList<String> = mutableListOf()
     private val feedbacks:MutableList<String> = mutableListOf()
-    var isRunning = true
-    var sentLastUpdate = 0L
+    private var isRunning = true
     private val wakeLock = MyWakeLock()
     private lateinit var viewGlobal:ViewDevice
     private lateinit var viewConfigMe:ViewDevice
     private lateinit var viewConfigClients:Array<ViewDevice>
+    private lateinit var configClients:Array<ConfigData>
     private val hasLaunched = mutableListOf<Long>()
-    private val socketListeners = mutableListOf<(String) -> Unit>()
+    private val socketReadListeners = mutableListOf<Pair<MySocket, (String) -> Unit>>()
+    private val socketCloseListeners = mutableListOf<Pair<MySocket, () -> Unit>>()
 
     @SuppressLint("MissingPermission")
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -46,27 +48,26 @@ class ActivityHome : AppCompatActivity() {
 
         //  *****   HOST
         if(Session.state == SessionState.HOST) {
-            val data = HostData.get
-            val configMe = ConfigData(data.hostName)
-            configMe.setAsHost()
-            val configClients = Array(data.clients.size) { i -> ConfigData(data.clients[i].name) }
+            val data = HostData.get!!
+            val configMe = ConfigData(data.hostName, true)
+            configClients = Array(data.clients.size) { i -> ConfigData(data.clients[i].name) }
 
             //  update
             addSocketListener(data.mySockets) {
-                receiveFeedback(it, false)
+                Session.tryReceiveFeedback(it) { msg -> receiveFeedback(msg, false) }
             }
+            addSocketCloseListener(data.mySockets)
 
             //  ui
             vConfig.visibility = View.VISIBLE
             vButtons.visibility = View.VISIBLE
             val vStart = findViewById<Button>(R.id.home_bStart)
-            val vSchedule = findViewById<Button>(R.id.home_bSchedule)
+//            val vSchedule = findViewById<Button>(R.id.home_bSchedule)
 
             vStart.setOnClickListener {
                 val start = StartData.create(MyTimer().time + data.delta, data.command, data.flavor, data.videoLength)
                 Session.starts.add(start)
-                log("sent start $start")
-                for (x in data.mySockets) start.send(x)
+                start.send(data.mySockets) { log(it) }
                 
                 vStart.isEnabled = false
                 thread {
@@ -77,84 +78,74 @@ class ActivityHome : AppCompatActivity() {
     
             viewGlobal = ViewDevice(this, vConfig)
             viewGlobal.vSettings.setOnClickListener {
-                HostData.createRoot(this).setOnCancelListener { tryUpdateViewGlobal() }
+                data.createDialog(this).setOnCancelListener { tryUpdateViewGlobal(data) }
             }
-            tryUpdateViewGlobal()
+            tryUpdateViewGlobal(data)
     
             viewConfigMe = ViewDevice(this, vConfig)
-            viewConfigMe.vTitle.text = configMe.deviceName
+            viewConfigMe.initView(configMe, "[host}")
             viewConfigMe.vSettings.setOnClickListener {
                 configMe.dialog(this).setOnCancelListener {
-                    configMe.updateView(viewConfigMe, "host")
+                    viewConfigMe.updateView(configMe, "[host]")
                 }
             }
-            configMe.updateView(viewConfigMe, "host")
     
             viewConfigClients = Array(configClients.size) { ViewDevice(this, vConfig) }
-            viewConfigClients.indices.forEach { configClients[it].updateView(viewConfigClients[it], "client") }
+            for (i in configClients.indices)
+                viewConfigClients[i].initView(configClients[i], "")
 
-            if(!data.isinit) {
+            if(!data.isInit) {
+                data.isInit = true
+                
                 //  dialogs
                 var iClient = 0
                 var dialogClient: () -> Unit = {}
                 dialogClient = {
                     if (iClient < configClients.size) {
-                        val config = configClients[iClient]
-                        val view = viewConfigClients[iClient]
-                        val socket = data.mySockets[iClient]
-
-                        config.dialog(this).setOnCancelListener {
-                            view.vTitle.text = config.deviceName
-                            view.vSettings.setOnClickListener {
-                                config.dialog(this).setOnCancelListener {
-                                    config.updateView(view, "client")
-                                    config.send(socket)
-                                    log("sent config $config")
+                        val i = iClient
+    
+                        configClients[i].dialog(this).setOnCancelListener {
+                            viewConfigClients[i].vSettings.setOnClickListener {
+                                configClients[i].dialog(this).setOnCancelListener {
+                                    configClients[i].send(data.mySockets[i]) { log(it) }
                                 }
                             }
-                            config.updateView(view, "client")
-                            config.send(socket)
-                            log("sent config $config")
-
+                            configClients[i].send(data.mySockets[i]) { log(it) }
+    
                             iClient++
                             dialogClient()
                         }
                     }
                 }
-                HostData.createRoot(this).setOnCancelListener {
-                    tryUpdateViewGlobal()
+                data.createDialog(this).setOnCancelListener {
+                    tryUpdateViewGlobal(data)
 
                     Session.currentConfig = configMe
                     configMe.dialog(this).setOnCancelListener {
-                        configMe.updateView(viewConfigMe, "host")
+                        viewConfigMe.updateView(configMe, "[host]")
 
                         dialogClient()
                     }
                 }
             }
-
-            //  post
-            data.tryInit()
         }
 
         //  *****   CLIENT
         else {
             val data = ClientData.get!!
-
-            if(data.mySocket != null)
-            {
-                addSocketListener(arrayOf(data.mySocket!!)) {
-                    ConfigData.tryReceive(data.deviceName, it) { cfg ->
-                        log("received config = $cfg")
-                        Session.currentConfig = cfg
-                    }
-                    StartData.tryReceive(it) { cfg ->
-                        log("received start = $cfg")
-                        Session.starts.add(cfg)
-                    }
-                    Session.tryReceive(it) { msg -> receiveFeedback(msg, false) }
+    
+            addSocketListener(arrayOf(data.mySocket)) {
+                ConfigData.tryReceive(data.deviceName, it) { cfg ->
+                    log("received config = $cfg")
+                    Session.currentConfig = cfg
                 }
+                StartData.tryReceive(it) { cfg ->
+                    log("received start = $cfg")
+                    Session.starts.add(cfg)
+                }
+                Session.tryReceiveFeedback(it) { msg -> receiveFeedback(msg, false) }
             }
+            addSocketCloseListener(arrayOf(data.mySocket))
         }
 
         //  misc
@@ -187,10 +178,6 @@ class ActivityHome : AppCompatActivity() {
                             break
                         }
 
-                //  client update host
-                if(Session.state == SessionState.CLIENT && MyTimer().time > sentLastUpdate + 1000)
-                    ClientData.get!!.mySocket?.write("update=${MyTimer().time}")
-
                 //  feedback
                 val feedback = if(Session.starts.any { !hasLaunched.contains(it.id) }) {
                     val all = Session.starts.filter { !hasLaunched.contains(it.id) }
@@ -199,7 +186,13 @@ class ActivityHome : AppCompatActivity() {
                     else "will start at ${Globals.FORMAT_TIME.format(all.minOf { it.timeOfInit })} (+${all.size} others)"
                 } else "no start scheduled"
                 runOnUiThread {
-                    vFeedback.text = "$feedback\n\n${feedbacks.reversed().joinToString("\n")}"
+                    vFeedback.setString("$feedback\n\n${feedbacks.reversed().joinToString("\n")}")
+                }
+                
+                //  host configs
+                if(Session.state == SessionState.HOST) {
+                    for(i in configClients.indices)
+                        updateClient(i)
                 }
 
                 Thread.sleep(20)
@@ -212,33 +205,35 @@ class ActivityHome : AppCompatActivity() {
         isRunning = false
         GpsTime.unregister()
         wakeLock.release()
-
-        if(Session.state == SessionState.HOST) {
-            val data = HostData.get
-
-            for (x in data.mySockets)
-                for (y in socketListeners)
-                    x.removeOnRead(y)
-        }
-        else {
-            val data = ClientData.get!!
-
-            for (y in socketListeners)
-                data.mySocket?.removeOnRead(y)
+        
+        for(x in socketReadListeners) x.first.removeOnRead(x.second)
+        for(x in socketCloseListeners) x.first.removeOnClose(x.second)
+    }
+    
+    private fun tryUpdateViewGlobal(data: HostData) {
+        if(this::viewGlobal.isInitialized) {
+            viewGlobal.vTitle.text = data.command
+            viewGlobal.vDesc.setString("flavor:${data.flavor/1000}s length:${data.videoLength/1000}s Δ:+${data.delta/1000}s")
         }
     }
     
-    private fun tryUpdateViewGlobal() {
-        if(this::viewGlobal.isInitialized) {
-            viewGlobal.vTitle.text = HostData.get.command
-            viewGlobal.vDesc.text = "flavor:${HostData.get.flavor/1000}s length:${HostData.get.videoLength/1000}s Δ:+${HostData.get.delta/1000}s"
-        }
+    private fun updateClient(i:Int) {
+        viewConfigClients[i].updateView(configClients[i], if(MyTimer().time - HostData.get!!.lastUpdate[i] < 3000) "[connected]" else "[DISCONNECTED]")
     }
 
     private fun addSocketListener(sockets: Array<MySocket>, action:(String) -> Unit) {
-        socketListeners.add(action)
-        for (x in sockets)
+        for (x in sockets) {
+            socketReadListeners.add(Pair(x, action))
             x.addOnRead(action)
+        }
+    }
+    
+    private fun addSocketCloseListener(sockets: Array<MySocket>) {
+        for (x in sockets) {
+            val action:() -> Unit = { log("[${x.port}] SOCKET CLOSED") }
+            socketCloseListeners.add(Pair(x, action))
+            x.addOnClose(action)
+        }
     }
 
     private fun log(string: String) {
@@ -255,16 +250,12 @@ class ActivityHome : AppCompatActivity() {
         if(!isBroadCast) return
         
         if(Session.state == SessionState.HOST) {
-            val data = HostData.get
-            
-            data.mySockets.forEach {
+            HostData.get!!.mySockets.forEach {
                 Session.sendFeedback(it, string)
             }
         }
         else {
-            val data = ClientData.get!!
-            
-            if(data.mySocket != null) Session.sendFeedback(data.mySocket!!, string)
+            Session.sendFeedback(ClientData.get!!.mySocket, string)
         }
     }
 

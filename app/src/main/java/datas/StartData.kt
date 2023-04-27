@@ -9,15 +9,18 @@ import org.json.JSONObject
 data class StartData(val id:Long, val timeOfInit:Long, val timeToCommand: Long, val videoLength: Long, val mpStartsBuild:String, val mpIdsBuild:String) {
     val config: ConfigData = Session.currentConfig.copy()
 
-    fun send(mySocket: MySocket) {
-        mySocket.write(JSONObject().apply {
-            accumulate("id", id)
-            accumulate("timeStamp", timeOfInit)
-            accumulate("commandLength", timeToCommand)
-            accumulate("videoLength", videoLength)
-            accumulate("mpStarts", mpStartsBuild)
-            accumulate("mps", mpIdsBuild)
-        }.toString())
+    fun send(mySockets: Array<MySocket>, action:((String) -> Unit)? = null) {
+        for (x in mySockets)
+            x.write(JSONObject().apply {
+                accumulate("id", id)
+                accumulate("timeStamp", timeOfInit)
+                accumulate("commandLength", timeToCommand)
+                accumulate("videoLength", videoLength)
+                accumulate("mpStarts", mpStartsBuild)
+                accumulate("mps", mpIdsBuild)
+            }.toString())
+        
+        action?.invoke("sent start $this")
     }
 
     val mpStarts:Array<Long> get() = mpStartsBuild.split(",").map { it.toLong() }.toTypedArray()
@@ -38,7 +41,7 @@ data class StartData(val id:Long, val timeOfInit:Long, val timeToCommand: Long, 
                 HostData.COMMAND_KURZ -> {
                     builder[R.raw.aufdieplaetze_5db] = 0
                     builder[R.raw.fertig_5db, flavor] = DURATION_FERTIG_MS
-                    builder[R.raw.gunshot_10db, Globals.RANDOM.nextLong(1000, 2000)] = DURATION_TO_SHOT_MS
+                    builder[R.raw.gunshot_10db, Globals.RANDOM.nextLong(700, 2000)] = DURATION_TO_SHOT_MS
                 }
                 HostData.COMMAND_MITTEL -> {
                     builder[R.raw.aufdieplaetze_5db] = 0

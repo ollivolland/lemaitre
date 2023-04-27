@@ -14,7 +14,7 @@ class ValueObservable<T: Any>(vararg observers: (T) -> Unit) {
 	init { this.observers.addAll(observers) }
 	
 	private fun observedSet(value: T) {
-		Log.i("vo", "set ${value.javaClass.simpleName}")
+//		Log.i("vo", "set ${value.javaClass.simpleName}")
 		if(isInitialized) throw Exception()
 		
 		this.actualValue = value
@@ -23,7 +23,7 @@ class ValueObservable<T: Any>(vararg observers: (T) -> Unit) {
 	}
 	
 	private fun observedGet():T {
-		Log.i("vo", "get ${actualValue.javaClass.simpleName}")
+//		Log.i("vo", "get ${actualValue.javaClass.simpleName}")
 		if(!isInitialized) throw Exception()
 		
 		return actualValue

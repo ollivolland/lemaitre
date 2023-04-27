@@ -2,6 +2,7 @@ import android.view.View
 import android.widget.AdapterView
 import android.widget.ArrayAdapter
 import android.widget.Spinner
+import android.widget.TextView
 import androidx.appcompat.R
 
 fun Spinner.config(headers: Array<String>, selectionIndex:Int, onSelect: (Int) -> Unit) {
@@ -14,4 +15,8 @@ fun Spinner.config(headers: Array<String>, selectionIndex:Int, onSelect: (Int) -
         }
     }
     this.setSelection(selectionIndex)
+}
+
+fun TextView.setString(text:String) {
+    this.text = text
 }

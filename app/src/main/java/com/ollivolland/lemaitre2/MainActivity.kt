@@ -29,6 +29,7 @@ import com.google.android.gms.location.SettingsClient
 import datas.ClientData
 import datas.HostData
 import org.json.JSONObject
+import setString
 import kotlin.concurrent.thread
 
 
@@ -37,7 +38,7 @@ class MainActivity : AppCompatActivity() {
     private val manager: WifiP2pManager by lazy { getSystemService(Context.WIFI_P2P_SERVICE) as WifiP2pManager }
     private val wifiManager: WifiManager by lazy { applicationContext.getSystemService(Context.WIFI_SERVICE) as WifiManager }
     private val locationManager: LocationManager by lazy { getSystemService(Context.LOCATION_SERVICE) as LocationManager }
-    var channel: WifiP2pManager.Channel? = null
+    private var channel: WifiP2pManager.Channel? = null
     private var receiver: MyWiFiDirectBroadcastReceiver? = null
     lateinit var mConnectionInfoListener: WifiP2pManager.ConnectionInfoListener
 
@@ -47,37 +48,35 @@ class MainActivity : AppCompatActivity() {
     private lateinit var mySocketFormation: MySocket
     var checkNeedAnotherSocket:() -> Unit ={}
     
-    //  urgent
-    //  TODO    VIDEO BROKEN, started 3 times filmed only once, ?did not crash
+    //  by urgency
+    //  todo    wifiP2p class
+    //  todo    net time
+    //  todo    audioTrack instead of MediaPlayer
+    //  todo    host send delay&gate, display only once both received
+    
     //  todo    schedule
-    //  todo    connection info
     //  todo    video timestamp
     //  todo    display images
-    
+    //  todo    microphone
     //  todo    stop start
-    //  todo    net time
     //  todo    persistent socket
+    //  todo    restart session
     //  todo    dialog spinner info
-    //  todo    change global config
-
     //  todo    firebase crash reporter
-    //  todo    net time
-    //  todo    wifip2p class
-    //  todo    audioTrack instead of MediaPlayer
 
     //  BUGS
-    //  todo    feedback bug
+    //  todo    feedback bug    ?still active
 
     private var isRunning = true
     private var isConnected = false
     private var isWantConnection = false
-    var isFormationSocketReady = true
+    private var isFormationSocketReady = true
     private var isTriedConnecting = false
     var isWantUpdateFormationDevices = true
 
     private val logs = mutableListOf<String>()
-    lateinit var vLogger:TextView
-    lateinit var vFeedback:TextView
+    private lateinit var vLogger:TextView
+    private lateinit var vFeedback:TextView
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -103,9 +102,9 @@ class MainActivity : AppCompatActivity() {
             Session.state= SessionState.HOST
             startRegistration()
 
-            vHost.text = "launch!"
-            vClient.isEnabled=false
-            vHost.isEnabled=false
+            vHost.setString("launch!")
+            vClient.isEnabled = false
+            vHost.isEnabled = false
             vHost.setOnClickListener {
                 HostData.set(thisDeviceName, clients)
                 log("finished with ${clients.size} clients")
@@ -179,7 +178,7 @@ class MainActivity : AppCompatActivity() {
                         if (jo.has("name")) {
                             val client = Client(ip, port, jo["name"] as String)
                             clients.add(client)
-                            toast("connected ${client.name}")
+                            runOnUiThread { Toast.makeText(this@MainActivity, "connected ${client.name}", Toast.LENGTH_LONG).show() }
                             log("client ${client.name} on [$port] => $ip")
 
                             this.close()
@@ -221,7 +220,7 @@ class MainActivity : AppCompatActivity() {
 
                             ClientData.set(jo["useport"] as Int, hostMac, this@MainActivity)
                             log("host = ${ClientData.get!!.port}")
-                            toast("connected to host")
+                            runOnUiThread { Toast.makeText(this@MainActivity, "connected to host", Toast.LENGTH_LONG).show() }
                         }
                     }
                     log{ s -> this@MainActivity.log(s) }
@@ -342,8 +341,6 @@ class MainActivity : AppCompatActivity() {
             })
         })
     }
-
-    fun toast(s:String) = runOnUiThread { Toast.makeText(this, s, Toast.LENGTH_LONG).show() }
 
     fun log(string: String) {
         println(string)

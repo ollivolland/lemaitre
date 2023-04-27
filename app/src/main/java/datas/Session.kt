@@ -17,7 +17,7 @@ class Session {
             }.toString())
         }
         
-        fun tryReceive(string: String, action:(String)->Unit) {
+        fun tryReceiveFeedback(string: String, action:(String)->Unit) {
             if(string.contains("\"key\":\"$KEY_FEEDBACK\"")) {
                 val jo = JSONObject(string)
 

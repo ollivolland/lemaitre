@@ -9,15 +9,15 @@ import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 import kotlin.concurrent.thread
 
-abstract class MySocket(private val port: Int, private val type:String) {
+abstract class MySocket(val port: Int, private val type:String) {
     private val executor: ExecutorService = Executors.newSingleThreadExecutor()
     protected val myOnSocketListener = mutableListOf<(Socket) -> Unit>()
     protected val myOnCloseListeners = mutableListOf<() -> Unit>()
-    val myOnReadListeners = mutableListOf<(String) -> Unit>()
+    protected val myOnReadListeners = mutableListOf<(String) -> Unit>()
     protected lateinit var mOutputStream: OutputStream
     protected lateinit var mInputStream: InputStream
-    protected var isOpen = true
     protected var isInputOpen = true
+    var isOpen = true;protected set
 
     fun log(f:(String)->Unit) {
         f("[$port] $type creating")
@@ -26,7 +26,7 @@ abstract class MySocket(private val port: Int, private val type:String) {
     }
 
     fun write(s:String) = write(s.encodeToByteArray())
-    fun write(byteArray: ByteArray) {
+    private fun write(byteArray: ByteArray) {
         if(!isOpen) return
         if(!this::mOutputStream.isInitialized) {
             myOnSocketListener.add { write(byteArray) } //  broken
@@ -48,7 +48,9 @@ abstract class MySocket(private val port: Int, private val type:String) {
     }
 
     fun addOnConfigured(action:(Socket) -> Unit) = myOnSocketListener.add(action)
+    
     fun addOnClose(action:() -> Unit) = myOnCloseListeners.add(action)
+    fun removeOnClose(action:() -> Unit) = myOnCloseListeners.remove(action)
 
     fun addOnRead(action:(String) -> Unit) = myOnReadListeners.add(action)
     fun removeOnRead(action:(String) -> Unit) = myOnReadListeners.remove(action)

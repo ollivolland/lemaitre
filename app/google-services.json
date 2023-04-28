@@ -1,0 +1,106 @@
+{
+  "project_info": {
+    "project_number": "569380100863",
+    "firebase_url": "https://ffcommand-default-rtdb.europe-west1.firebasedatabase.app",
+    "project_id": "ffcommand",
+    "storage_bucket": "ffcommand.appspot.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:569380100863:android:2174af7069e7b2a680caca",
+        "android_client_info": {
+          "package_name": "com.ollivolland.ffekommando"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "569380100863-0p9r79k42pq06i52rl554qobe4hg5ic7.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCkDMC8EQwqeAWW84-1JzmYw-HhYloavog"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "569380100863-0p9r79k42pq06i52rl554qobe4hg5ic7.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:569380100863:android:1579a3983e6e93ed80caca",
+        "android_client_info": {
+          "package_name": "com.ollivolland.lemaitre"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "569380100863-0p9r79k42pq06i52rl554qobe4hg5ic7.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCkDMC8EQwqeAWW84-1JzmYw-HhYloavog"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "569380100863-0p9r79k42pq06i52rl554qobe4hg5ic7.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:569380100863:android:29ef15a9daf934f780caca",
+        "android_client_info": {
+          "package_name": "com.ollivolland.lemaitre2"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "569380100863-833afs6tkv4aaschkdcs5hqvgnfqk6g2.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.ollivolland.lemaitre2",
+            "certificate_hash": "6f60997d136427cc402fa7b84fab91b8c43a61b9"
+          }
+        },
+        {
+          "client_id": "569380100863-0p9r79k42pq06i52rl554qobe4hg5ic7.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCkDMC8EQwqeAWW84-1JzmYw-HhYloavog"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "569380100863-0p9r79k42pq06i52rl554qobe4hg5ic7.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

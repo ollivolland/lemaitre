@@ -11,7 +11,6 @@ import android.util.Log
 import java.io.File
 import java.text.SimpleDateFormat
 import java.util.*
-import kotlin.math.pow
 
 class MyRecorder(private val myCamera2: MyCamera2, private val recordingProfileBuilder: RecordingProfileBuilder) {
 	private val codec: MediaCodec
@@ -30,7 +29,7 @@ class MyRecorder(private val myCamera2: MyCamera2, private val recordingProfileB
 		val mimeType = MediaFormat.MIMETYPE_VIDEO_AVC
 		val format = MediaFormat.createVideoFormat(mimeType, recordingProfile.width, recordingProfile.height)
 		format.setInteger(MediaFormat.KEY_COLOR_FORMAT, MediaCodecInfo.CodecCapabilities.COLOR_FormatSurface)
-		format.setInteger(MediaFormat.KEY_BIT_RATE, recordingProfile.bitrate)
+		format.setInteger(MediaFormat.KEY_BIT_RATE, recordingProfile.bytesPerSecond * 8)
 		format.setInteger(MediaFormat.KEY_FRAME_RATE, recordingProfile.fps)
 		format.setInteger(MediaFormat.KEY_I_FRAME_INTERVAL, 1)
 		
@@ -124,14 +123,14 @@ class MyRecorder(private val myCamera2: MyCamera2, private val recordingProfileB
 		isWantStop = true
 	}
 	
-	internal data class RecordingProfile(val width: Int, val height: Int, val bitrate: Int, val fps: Int)
+	internal data class RecordingProfile(val width: Int, val height: Int, val bytesPerSecond: Int, val fps: Int)
 	
 	class RecordingProfileBuilder {
 		var width = 1920
 		var height = 1080
-		var bitrate = (2 * 2.0.pow(20) * 8).toInt()    //Mb/s
+		var bytesPerSecond = 2_000_000
 		var fps = 30
 		
-		internal fun build():RecordingProfile = RecordingProfile(width, height, bitrate, fps)
+		internal fun build():RecordingProfile = RecordingProfile(width, height, bytesPerSecond, fps)
 	}
 }

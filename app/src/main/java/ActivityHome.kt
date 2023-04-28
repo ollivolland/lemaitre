@@ -54,6 +54,8 @@ class ActivityHome : AppCompatActivity() {
 
             //  update
             addSocketListener(data.mySockets) {
+                println("socket received ${it.take(100)}")
+                
                 Session.tryReceiveFeedback(it) { msg -> receiveFeedback(msg, false) }
             }
             addSocketCloseListener(data.mySockets)
@@ -135,6 +137,8 @@ class ActivityHome : AppCompatActivity() {
             val data = ClientData.get!!
     
             addSocketListener(arrayOf(data.mySocket)) {
+                println("socket received ${it.take(100)}")
+                
                 ConfigData.tryReceive(data.deviceName, it) { cfg ->
                     log("received config = $cfg")
                     Session.currentConfig = cfg

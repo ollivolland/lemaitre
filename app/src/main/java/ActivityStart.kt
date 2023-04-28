@@ -50,6 +50,7 @@ class ActivityStart : AppCompatActivity() {
         if(start.config.isCamera) {
             myRecorder = myCamera2.addRecorder(MyRecorder.RecordingProfileBuilder().apply {
                 fps = start.config.fps
+                bytesPerSecond = 5_000_000
             })
             isCameraStarted = false
             isCameraStopped = false
@@ -61,7 +62,6 @@ class ActivityStart : AppCompatActivity() {
             analyzer.onStreakStartedListeners.add {
                 val msg = "gate: ${it/1000}.${String.format("%03d", it%1000)} s"
                 runOnUiThread { vLog.text = "${vLog.text}\n$msg" }
-//                sendFeedback?.invoke(msg, true)
             }
             analyzer.onTriangulatedListeners.add{ tri, fra ->
                 val msg = "gate: ${tri/1000}.${String.format("%03d", tri%1000)}s   (~${fra/1000}.${String.format("%03d", fra%1000)}s)"

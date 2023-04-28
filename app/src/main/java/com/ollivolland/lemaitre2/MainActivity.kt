@@ -53,16 +53,15 @@ class MainActivity : AppCompatActivity() {
     //  todo    net time
     //  todo    audioTrack instead of MediaPlayer
     //  todo    host send delay&gate, display only once both received
+    //  todo    microphone
     
     //  todo    schedule
     //  todo    video timestamp
     //  todo    display images
-    //  todo    microphone
     //  todo    stop start
     //  todo    persistent socket
     //  todo    restart session
     //  todo    dialog spinner info
-    //  todo    firebase crash reporter
 
     //  BUGS
     //  todo    feedback bug    ?still active

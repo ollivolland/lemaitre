@@ -32,8 +32,12 @@ class ClientData private constructor(val port: Int, val hostMac:String, val devi
         //  client update host
         thread {
             while (mySocket.isOpen) {
-                if(MyTimer().time > sentLastUpdate + 1000)
-                    mySocket.write("update=${MyTimer().time}")
+                if(MyTimer().time > sentLastUpdate + 1000) {
+                    sentLastUpdate = MyTimer().time
+                    mySocket.write("update=${sentLastUpdate}")
+                }
+                
+                Thread.sleep(20)
             }
         }
     }

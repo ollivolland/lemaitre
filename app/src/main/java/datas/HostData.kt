@@ -1,10 +1,10 @@
 package datas
 
+import Client
 import android.app.Dialog
 import android.content.Context
 import android.widget.Spinner
 import android.widget.TextView
-import com.ollivolland.lemaitre2.Client
 import com.ollivolland.lemaitre2.MyClientThread
 import com.ollivolland.lemaitre2.MySocket
 import com.ollivolland.lemaitre2.R

@@ -11,13 +11,19 @@ import kotlin.concurrent.thread
 
 abstract class MySocket(val port: Int, private val type:String) {
     private val executor: ExecutorService = Executors.newSingleThreadExecutor()
-    protected val myOnSocketListener = mutableListOf<(Socket) -> Unit>()
-    protected val myOnCloseListeners = mutableListOf<() -> Unit>()
-    protected val myOnReadListeners = mutableListOf<(String) -> Unit>()
-    protected lateinit var mOutputStream: OutputStream
+    private val myOnSocketListener = mutableListOf<((Socket) -> Unit)?>()
+    private val myOnCloseListeners = mutableListOf<(() -> Unit)?>()
+    protected val myOnReadListeners = mutableListOf<((String) -> Unit)?>()
+    private lateinit var mOutputStream: OutputStream
     protected lateinit var mInputStream: InputStream
     protected var isInputOpen = true
+    protected lateinit var socket: Socket
+    private var isSocketConfigured = false
     var isOpen = true;protected set
+    
+    init {
+    	println("[$port] $type creating")
+    }
 
     fun log(f:(String)->Unit) {
         f("[$port] $type creating")
@@ -41,30 +47,62 @@ abstract class MySocket(val port: Int, private val type:String) {
             }
         }
     }
+    
+    protected fun myClose() {
+        socket.close()
+        
+        println("[$port] $type closed")
+        for (x in myOnCloseListeners) x?.invoke()
+    }
+    
+    protected fun mySocket() {
+        if(isSocketConfigured) throw Exception()
+        
+        isSocketConfigured = true
+        mInputStream = socket.getInputStream()
+        mOutputStream = socket.getOutputStream()
+        
+        println("[$port] $type created ${socket.localAddress.hostAddress} => ${socket.inetAddress.hostAddress}")
+        for (x in myOnSocketListener) x?.invoke(socket)
+    }
 
     fun close() {
         executor.execute { isInputOpen = false }
-        isOpen=false
+        isOpen = false
     }
 
-    fun addOnConfigured(action:(Socket) -> Unit) = myOnSocketListener.add(action)
+    fun addOnConfigured(action:(Socket) -> Unit) {
+        if(isSocketConfigured) action(socket)
+        myOnSocketListener.add(action)
+    }
     
+    fun addOnCloseIndex(action:() -> Unit):Int {
+        myOnCloseListeners.add(action)
+        return myOnCloseListeners.lastIndex
+    }
     fun addOnClose(action:() -> Unit) = myOnCloseListeners.add(action)
-    fun removeOnClose(action:() -> Unit) = myOnCloseListeners.remove(action)
+    
+    fun removeOnClose(i: Int) {
+        myOnCloseListeners[i] = null
+    }
 
+    fun addOnReadIndex(action:(String) -> Unit):Int {
+        myOnReadListeners.add(action)
+        return myOnReadListeners.lastIndex
+    }
     fun addOnRead(action:(String) -> Unit) = myOnReadListeners.add(action)
-    fun removeOnRead(action:(String) -> Unit) = myOnReadListeners.remove(action)
+    fun removeOnRead(i: Int) {
+        myOnReadListeners[i] = null
+    }
 }
 
 class MyClientThread(private val inetAddress: String, port: Int): MySocket(port, "client") {
-    private val socket: Socket = Socket()
-
     init {
+        socket = Socket()
+        
         thread {
             socket.connect(InetSocketAddress(inetAddress, port), 3000)
-            mInputStream = socket.getInputStream()
-            mOutputStream = socket.getOutputStream()
-            for (x in myOnSocketListener) x(socket)
+            mySocket()
 
             val buffer = ByteArray(1024)
             var length:Int
@@ -76,7 +114,7 @@ class MyClientThread(private val inetAddress: String, port: Int): MySocket(port,
                         val s = String(buffer, 0, length)
     
                         for (x in myOnReadListeners)
-                            try { x(s) }
+                            try { x?.invoke(s) }
                             catch (e:Exception) { e.printStackTrace() }
                     }
                 } catch (e:Exception) {
@@ -85,25 +123,21 @@ class MyClientThread(private val inetAddress: String, port: Int): MySocket(port,
                 }
             }
 
-            while (!isInputOpen) Thread.sleep(1)
-            Thread.sleep(100)
+            while (isInputOpen) Thread.sleep(1)
+//            Thread.sleep(100)
 
-            socket.close()
-            for (x in myOnCloseListeners) x()
+            myClose()
         }
     }
 }
 
 class MyServerThread(port:Int): MySocket(port, "server") {
     private var serverSocket: ServerSocket = ServerSocket(port)
-    lateinit var socket: Socket
 
     init {
         thread {
             socket  = serverSocket.accept()
-            mInputStream = socket.getInputStream()
-            mOutputStream = socket.getOutputStream()
-            for (x in myOnSocketListener) x(socket)
+            mySocket()
 
             val buffer = ByteArray(1024)
             var length:Int
@@ -115,7 +149,7 @@ class MyServerThread(port:Int): MySocket(port, "server") {
                         val s = String(buffer, 0, length)
 
                         for (x in myOnReadListeners)
-                            try { x(s) }
+                            try { x?.invoke(s) }
                             catch (e:Exception) { e.printStackTrace() }
                     }
                 } catch (e:Exception) {
@@ -124,11 +158,10 @@ class MyServerThread(port:Int): MySocket(port, "server") {
                 }
             }
 
-            while (!isInputOpen) Thread.sleep(1)
+            while (isInputOpen) Thread.sleep(1)
 
-            socket.close()
             serverSocket.close()
-            for (x in myOnCloseListeners) x()
+            myClose()
         }
     }
 }

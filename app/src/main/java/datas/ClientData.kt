@@ -19,15 +19,26 @@ class ClientData private constructor(val port: Int, val hostMac:String, val devi
         mySocket.log { s -> mainActivity?.log(s) }
         
         //  launch host
-        var finReader:(String) -> Unit = {}
-        finReader = { s2 ->
-            if(s2 == "fin") {
-                mySocket.removeOnRead(finReader)
+        var finReaderIndex = -1
+        finReaderIndex = mySocket.addOnReadIndex { s ->
+            if(s == "fin") {
+                mySocket.removeOnRead(finReaderIndex)
                 mainActivity!!.startActivity(Intent(mainActivity, ActivityHome::class.java))
                 mainActivity.finish()
             }
         }
-        mySocket.addOnRead(finReader)
+        
+        //  readers
+        mySocket.addOnRead {
+            ConfigData.tryReceive(deviceName, it) { cfg ->
+//                log("received config = $cfg")
+                Session.currentConfig = cfg
+            }
+            StartData.tryReceive(it) { cfg ->
+//                log("received start = $cfg")
+                Session.starts.add(cfg)
+            }
+        }
     
         //  client update host
         thread {
@@ -45,10 +56,10 @@ class ClientData private constructor(val port: Int, val hostMac:String, val devi
     companion object {
         var get: ClientData? = null; private set
 
-        fun set(port:Int, hostMac: String, mainActivity: MainActivity) {
+        fun set(port:Int, hostMac: String, deviceName: String, mainActivity: MainActivity) {
             if(get != null) throw Exception()
             
-            get = ClientData(port, hostMac, mainActivity.thisDeviceName, mainActivity)
+            get = ClientData(port, hostMac, deviceName, mainActivity)
         }
     }
 }

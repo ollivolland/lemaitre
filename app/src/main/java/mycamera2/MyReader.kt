@@ -4,7 +4,7 @@ import android.graphics.ImageFormat
 import android.media.Image
 import android.media.ImageReader
 
-class MyReader(private val myCamera2: MyCamera2, private val readerProfileBuilder: ReaderProfileBuilder, val listener:ImageReader.OnImageAvailableListener) {
+class MyReader(private val myCamera2: MyCamera2, readerProfileBuilder: ReaderProfileBuilder, listener:ImageReader.OnImageAvailableListener) {
 	
 	init {
 		val surfaceObservable = myCamera2.addSurface()

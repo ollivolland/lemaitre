@@ -84,7 +84,10 @@ class Analyzer(private val context: Context, myCamera2: MyCamera2, private val m
 		
 		image.close()
 	}
-	val myReader: MyReader = myCamera2.addReader(MyReader.ReaderProfileBuilder(), listenTo)
+	val myReader: MyReader = myCamera2.addReader(MyReader.ReaderProfileBuilder().also {
+		it.width = WIDTH
+		it.height = HEIGHT
+	}, listenTo)
 
 	init {
 		File("${Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DCIM)}/${Globals.DIR_NAME}/$day/$session").mkdirs()
@@ -139,6 +142,7 @@ class Analyzer(private val context: Context, myCamera2: MyCamera2, private val m
 				yIndex = HALF_HEIGHT * WIDTH
 				for (x in 0 until WIDTH) newBuffer[yIndex + x] = colorMid
 
+				//  TODO    get direction from image
 				var yFirstBroken = 0
 				val drawDiagram: (IntArray) -> Unit = { useYBroken ->
 					//  diagram
@@ -182,6 +186,9 @@ class Analyzer(private val context: Context, myCamera2: MyCamera2, private val m
 					"numDeltas = $numDeltas\n" +
 					"adjustmentMs = $adjustmentMs"
 				)
+				
+				//	release buffer
+				needed[neededIndex] = -3
 
 				val bmp = Bitmap.createBitmap(WIDTH, HEIGHT, Bitmap.Config.ARGB_8888)
 				bmp.copyPixelsFromBuffer(IntBuffer.wrap(newBuffer))
@@ -200,9 +207,6 @@ class Analyzer(private val context: Context, myCamera2: MyCamera2, private val m
 					bmp.recycle()
 					out.flush()
 				}
-
-				//	release buffer
-				needed[neededIndex] = -3
 			} catch (e:Exception) {
 				e.printStackTrace()
 			}

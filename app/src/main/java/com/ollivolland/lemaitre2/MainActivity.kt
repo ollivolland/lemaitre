@@ -1,18 +1,11 @@
 package com.ollivolland.lemaitre2
 
-import MyWifiP2pActionListener
+import MyWifiP2p
 import android.Manifest
-import android.annotation.SuppressLint
 import android.content.*
 import android.content.pm.PackageManager
 import android.location.LocationManager
 import android.net.wifi.WifiManager
-import android.net.wifi.WpsInfo
-import android.net.wifi.p2p.WifiP2pConfig
-import android.net.wifi.p2p.WifiP2pDevice
-import android.net.wifi.p2p.WifiP2pManager
-import android.net.wifi.p2p.nsd.WifiP2pDnsSdServiceInfo
-import android.net.wifi.p2p.nsd.WifiP2pDnsSdServiceRequest
 import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
@@ -28,30 +21,14 @@ import com.google.android.gms.location.LocationSettingsRequest
 import com.google.android.gms.location.SettingsClient
 import datas.ClientData
 import datas.HostData
-import org.json.JSONObject
 import setString
 import kotlin.concurrent.thread
 
 
 class MainActivity : AppCompatActivity() {
-    var thisDeviceName: String = ""
-    private val manager: WifiP2pManager by lazy { getSystemService(Context.WIFI_P2P_SERVICE) as WifiP2pManager }
-    private val wifiManager: WifiManager by lazy { applicationContext.getSystemService(Context.WIFI_SERVICE) as WifiManager }
-    private val locationManager: LocationManager by lazy { getSystemService(Context.LOCATION_SERVICE) as LocationManager }
-    private var channel: WifiP2pManager.Channel? = null
-    private var receiver: MyWiFiDirectBroadcastReceiver? = null
-    lateinit var mConnectionInfoListener: WifiP2pManager.ConnectionInfoListener
-
-    val formationDevices = mutableListOf<WifiP2pDevice>()
-    private val clients = mutableListOf<Client>()
-    private lateinit var hostMac:String
-    private lateinit var mySocketFormation: MySocket
-    var checkNeedAnotherSocket:() -> Unit ={}
-    
     //  by urgency
-    //  todo    wifiP2p class
     //  todo    net time
-    //  todo    audioTrack instead of MediaPlayer
+    //  todo    audioTrack instead of MediaPlayer   https://stackoverflow.com/questions/12263671/audiotrack-android-playing-sounds-from-raw-folder
     //  todo    host send delay&gate, display only once both received
     //  todo    microphone
     
@@ -64,16 +41,13 @@ class MainActivity : AppCompatActivity() {
     //  todo    dialog spinner info
 
     //  BUGS
-    //  todo    feedback bug    ?still active
-
+    
+    private val wifiManager: WifiManager by lazy { applicationContext.getSystemService(Context.WIFI_SERVICE) as WifiManager }
+    private val locationManager: LocationManager by lazy { getSystemService(Context.LOCATION_SERVICE) as LocationManager }
     private var isRunning = true
-    private var isConnected = false
-    private var isWantConnection = false
-    private var isFormationSocketReady = true
-    private var isTriedConnecting = false
-    var isWantUpdateFormationDevices = true
-
+    lateinit var myWifiP2p:MyWifiP2p
     private val logs = mutableListOf<String>()
+    
     private lateinit var vLogger:TextView
     private lateinit var vFeedback:TextView
 
@@ -96,17 +70,21 @@ class MainActivity : AppCompatActivity() {
         val vClient = findViewById<Button>(R.id.buttonClient)
         vLogger = findViewById(R.id.logger)
         vFeedback = findViewById(R.id.main_tFeedback)
+        
+        //  wifi
+        myWifiP2p = MyWifiP2p(this)
 
         vHost.setOnClickListener {
             Session.state= SessionState.HOST
-            startRegistration()
+            myWifiP2p.startRegistration()
 
             vHost.setString("launch!")
             vClient.isEnabled = false
             vHost.isEnabled = false
             vHost.setOnClickListener {
-                HostData.set(thisDeviceName, clients)
-                log("finished with ${clients.size} clients")
+                HostData.set(myWifiP2p.deviceName, myWifiP2p.clients)
+                myWifiP2p.isWantDiscoverPeers = false
+                log("finished with ${myWifiP2p.clients.size} clients")
 
                 startActivity(Intent(this, ActivityHome::class.java))
                 finish()
@@ -120,7 +98,7 @@ class MainActivity : AppCompatActivity() {
 
         vClient.setOnClickListener {
             Session.state= SessionState.CLIENT
-            discover()
+            myWifiP2p.discover()
 
             vHost.visibility = View.INVISIBLE
             vHost.isEnabled=false
@@ -129,8 +107,6 @@ class MainActivity : AppCompatActivity() {
 
         //  setup
         log("sdk ${Build.VERSION.SDK_INT}")
-        channel = manager.initialize(this, mainLooper, null)
-        receiver = MyWiFiDirectBroadcastReceiver(manager, channel!!, this)
 
         //  enable wifi
         if(!wifiManager.isWifiEnabled) {
@@ -144,102 +120,16 @@ class MainActivity : AppCompatActivity() {
         if(!locationManager.isProviderEnabled(LocationManager.GPS_PROVIDER))
             buildAlertMessageNoGps()
 
-        //  reset all wifiP2p connections, groups and services
-        manager.stopPeerDiscovery(channel, MyWifiP2pActionListener("stopPeerDiscovery").setOnComplete {
-            manager.clearServiceRequests(channel, MyWifiP2pActionListener("clearServiceRequests").setOnComplete {
-                manager.clearLocalServices(channel, MyWifiP2pActionListener("clearLocalServices").setOnComplete {
-                    manager.cancelConnect(channel, MyWifiP2pActionListener("cancelConnect").setOnComplete {
-                        manager.removeGroup(channel, MyWifiP2pActionListener("removeGroup").setOnComplete {
-                            isWantConnection = true
-                            log("all connections reset")
-                        })
-                    })
-                })
-            })
-        })
-
-        checkNeedAnotherSocket = {
-            if (Session.state ==  SessionState.HOST && isFormationSocketReady && clients.count() < formationDevices.count()) {
-                isFormationSocketReady=false
-                val port = PORT_COMMUNICATION + clients.count()
-                var ip = ""
-                mySocketFormation = MyServerThread(PORT_FORMATION).apply {
-                    addOnConfigured {
-                        ip = it.inetAddress.hostAddress!!
-
-                        this.write(JSONObject().apply {
-                            accumulate("useport", port)
-                        }.toString())
-                    }
-                    addOnRead { s ->
-                        val jo = JSONObject(s)
-
-                        if (jo.has("name")) {
-                            val client = Client(ip, port, jo["name"] as String)
-                            clients.add(client)
-                            runOnUiThread { Toast.makeText(this@MainActivity, "connected ${client.name}", Toast.LENGTH_LONG).show() }
-                            log("client ${client.name} on [$port] => $ip")
-
-                            this.close()
-                        }
-                    }
-                    addOnClose {
-                        isFormationSocketReady=true
-                        checkNeedAnotherSocket()
-                    }
-                    log{ s -> this@MainActivity.log(s) }
-                }
-            }
-        }
-
-        mConnectionInfoListener = WifiP2pManager.ConnectionInfoListener { info ->
-            if(!isWantConnection) return@ConnectionInfoListener
-
-            println("connection: formed = ${info.groupFormed}, isOwner = ${info.isGroupOwner}")
-
-            if(!isConnected && info.groupFormed) log("CONNECTED (${info.groupOwnerAddress.hostAddress})")
-            if(isConnected && !info.groupFormed) log("DISCONNECTED")
-
-
-            //  if connected check if another device wants to connect
-            if(info.isGroupOwner) manager.discoverPeers(channel, MyWifiP2pActionListener("discoverPeers"))
-
-            //  sockets
-            checkNeedAnotherSocket()
-            if(Session.state ==  SessionState.CLIENT && !this::mySocketFormation.isInitialized && info.groupOwnerAddress.hostAddress != null) {
-                mySocketFormation = MyClientThread(info.groupOwnerAddress.hostAddress!!, PORT_FORMATION).apply {
-                    addOnRead { s ->
-                        val jo = JSONObject(s)
-
-                        if(jo.has("useport")) {
-                            this.write(JSONObject().apply {
-                                accumulate("name", thisDeviceName)
-                            }.toString())
-                            this.close()
-
-                            ClientData.set(jo["useport"] as Int, hostMac, this@MainActivity)
-                            log("host = ${ClientData.get!!.port}")
-                            runOnUiThread { Toast.makeText(this@MainActivity, "connected to host", Toast.LENGTH_LONG).show() }
-                        }
-                    }
-                    log{ s -> this@MainActivity.log(s) }
-                }
-            }
-
-            isConnected = info.groupFormed
-        }
-        manager.requestConnectionInfo(channel, mConnectionInfoListener)
-
         //  UIThread
         thread {
             while (isRunning) {
                 runOnUiThread {
                     vFeedback.text = when (Session.state) {
                         SessionState.HOST -> {
-                            if(clients.size == 0) "no clients"
-                            else clients.joinToString("\n") { it.name }
+                            if(myWifiP2p.clients.size == 0) "no clients"
+                            else myWifiP2p.clients.joinToString("\n") { it.name }
                         }
-                        SessionState.CLIENT -> "waiting for host"
+                        SessionState.CLIENT -> if(ClientData.get == null) "waiting for host" else "CONNECTED"
                         else -> "choose"
                     }
                 }
@@ -252,20 +142,17 @@ class MainActivity : AppCompatActivity() {
     override fun onDestroy() {
         super.onDestroy()
         isRunning = false
-
-        manager.clearLocalServices(channel, MyWifiP2pActionListener("clearLocalServices"))
-        manager.clearServiceRequests(channel, MyWifiP2pActionListener("clearServiceRequests"))
-        manager.stopPeerDiscovery(channel, MyWifiP2pActionListener("stopPeerDiscovery"))
+        myWifiP2p.stopNSD()
     }
 
     override fun onResume() {
         super.onResume()
-        receiver?.register()
+        myWifiP2p.receiver.register()
     }
 
     override fun onPause() {
         super.onPause()
-        receiver?.unregister()
+        myWifiP2p.receiver.unregister()
     }
 
     private fun buildAlertMessageNoGps() {
@@ -288,59 +175,6 @@ class MainActivity : AppCompatActivity() {
             }
     }
 
-    @SuppressLint("MissingPermission")
-    private fun discover() {
-        manager.setDnsSdResponseListeners(channel,
-            { instanceName, registrationType, resourceType -> log("servlistener: $instanceName $registrationType ${resourceType.deviceName} ${resourceType.deviceAddress}") },
-            { fullDomain, record, device ->
-                log("DNS: $record $fullDomain")
-
-                //  connect from host
-                if(!isTriedConnecting) {
-                    isTriedConnecting = true
-
-                    hostMac = device.deviceAddress
-                    val config = WifiP2pConfig().apply {
-                        deviceAddress = hostMac
-                        wps.setup = WpsInfo.PBC
-                    }
-                    manager.connect(channel!!, config, MyWifiP2pActionListener("connect"))
-                }
-            })
-        manager.setUpnpServiceResponseListener(channel) { list, device -> log("UPNP: $list $device") }
-        manager.setServiceResponseListener(channel) { p0, p1, p2 -> log("service $p0 $p1 $p2") }
-
-        val serviceRequest = WifiP2pDnsSdServiceRequest.newInstance()
-        manager.addServiceRequest(channel, serviceRequest, MyWifiP2pActionListener("addServiceRequest").setOnSuccess {
-            thread {
-                while (!isTriedConnecting) {
-                    manager.discoverServices(channel, MyWifiP2pActionListener("discoverServices"))  //  after service request
-                    Thread.sleep(3000)
-                }
-            }
-        })
-    }
-
-    @SuppressLint("MissingPermission")
-    private fun startRegistration() {
-        //  Pass it an instance name, service type (_protocol._transportlayer) , and the map containing information other devices will want once they connect to this one.
-        val serviceInfo1 = WifiP2pDnsSdServiceInfo.newInstance(SERVICE_NAME, SERVICE_TYPE, mapOf())
-
-        //  create service
-        manager.createGroup(channel, MyWifiP2pActionListener("createGroup").setOnSuccess {
-            manager.addLocalService(channel, serviceInfo1, MyWifiP2pActionListener("addLocalService").setOnSuccess {
-                log("DNS added")
-
-                thread {
-                     while (isRunning) {
-                         manager.discoverPeers(channel, MyWifiP2pActionListener("discoverPeers"))
-                         Thread.sleep(3000)
-                    }
-                }
-            })
-        })
-    }
-
     fun log(string: String) {
         println(string)
         logs.add(string)
@@ -354,78 +188,6 @@ class MainActivity : AppCompatActivity() {
         const val PORT_COMMUNICATION = 8900 //  +10
         const val SERVICE_NAME = "_ollivollandlemaitre"
         const val SERVICE_TYPE = "_presence._tcp"
-    }
-}
-
-data class Client(
-    val ipWifiP2p:String,
-    val port:Int,
-    val name:String,
-)
-
-class MyWiFiDirectBroadcastReceiver(
-    private val manager: WifiP2pManager,
-    private val channel: WifiP2pManager.Channel,
-    private val activity: MainActivity
-) : BroadcastReceiver() {
-    @SuppressLint("MissingPermission")
-    override fun onReceive(context: Context, intent: Intent) {
-        when (intent.action!!) {
-            WifiP2pManager.WIFI_P2P_THIS_DEVICE_CHANGED_ACTION -> {
-                println("WIFI_P2P_THIS_DEVICE_CHANGED_ACTION")
-
-                val device = intent.getParcelableExtra(WifiP2pManager.EXTRA_WIFI_P2P_DEVICE) as WifiP2pDevice?
-                if(device != null && activity.thisDeviceName.isEmpty()) {
-                    activity.thisDeviceName = device.deviceName
-                    activity.log("deviceName = ${activity.thisDeviceName}")
-                }
-            }
-            WifiP2pManager.WIFI_P2P_CONNECTION_CHANGED_ACTION -> {
-                println("WIFI_P2P_CONNECTION_CHANGED_ACTION")
-
-                // Respond to new connection or disconnections
-                manager.requestConnectionInfo(channel, activity.mConnectionInfoListener)
-            }
-            WifiP2pManager.WIFI_P2P_PEERS_CHANGED_ACTION -> {
-                println("WIFI_P2P_PEERS_CHANGED_ACTION")
-
-                // Respond to new connection or disconnections
-                if(activity.isWantUpdateFormationDevices) {
-                    manager.requestPeers(channel) { list ->
-                        list.deviceList.forEach {
-                            if (!activity.formationDevices.contains(it)) {
-                                activity.formationDevices.add(it)
-                                activity.log("found ${it.deviceName}")
-
-                                if(Session.state ==  SessionState.HOST) {
-                                    val config = WifiP2pConfig().apply {
-                                        deviceAddress = it.deviceAddress
-                                        wps.setup = WpsInfo.PBC
-                                    }
-                                    manager.connect(channel, config, MyWifiP2pActionListener("connect"))
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    fun register() {
-        activity.registerReceiver(this, INTENT_FILTER)
-    }
-
-    fun unregister() {
-        activity.unregisterReceiver(this)
-    }
-
-    companion object {
-        private val INTENT_FILTER = IntentFilter().apply {
-            addAction(WifiP2pManager.WIFI_P2P_PEERS_CHANGED_ACTION)
-            addAction(WifiP2pManager.WIFI_P2P_CONNECTION_CHANGED_ACTION)
-            addAction(WifiP2pManager.WIFI_P2P_THIS_DEVICE_CHANGED_ACTION)
-        }
     }
 }
 

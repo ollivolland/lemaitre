@@ -14,6 +14,7 @@ import datas.StartData
 import mycamera2.MyCamera2
 import mycamera2.MyRecorder
 import kotlin.concurrent.thread
+import kotlin.math.abs
 
 class ActivityStart : AppCompatActivity() {
     lateinit var timer:MyTimer
@@ -24,6 +25,8 @@ class ActivityStart : AppCompatActivity() {
     private val mps = mutableListOf<MediaPlayer>()
     private var isCameraStarted = true; private var isCameraStopped = true
     private var isGateStarted = true; private var isGateStopped = true
+    private var isGateMpReady = true
+    private lateinit var gateMp:MediaPlayer
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -62,15 +65,30 @@ class ActivityStart : AppCompatActivity() {
             analyzer.onStreakStartedListeners.add {
                 val msg = "gate: ${it/1000}.${String.format("%03d", it%1000)} s"
                 runOnUiThread { vLog.text = "${vLog.text}\n$msg" }
+                
+                if(isGateMpReady) {
+                    isGateMpReady = false
+                    gateMp.start()
+                }
             }
-            analyzer.onTriangulatedListeners.add{ tri, fra ->
-                val msg = "gate: ${tri/1000}.${String.format("%03d", tri%1000)}s   (~${fra/1000}.${String.format("%03d", fra%1000)}s)"
-                sendFeedback?.invoke(msg, true)
+            analyzer.onTriangulatedListeners.add { triangleMs, frameMs, deltas ->
+                val gate = if(triangleMs == 0L) "invalid" else "${String.format("%.3f", triangleMs * 0.001)}s"
+                val msg = "gate: $gate   (${String.format("%.2f", frameMs * 0.001)}Δ${if(deltas<0) "-" else "+"}${String.format("%.1f", abs(deltas))})"
+                
+                showFeedback?.invoke(msg)
+                broadcastFeedback?.invoke(msg)
             }
             
             vGateLine.visibility = View.VISIBLE
             isGateStarted = false
             isGateStopped = false
+    
+            gateMp = MediaPlayer.create(this, R.raw.beep_middle_5db)
+            gateMp.setOnCompletionListener {
+                gateMp.pause()
+                gateMp.seekTo(0)
+                isGateMpReady = true
+            }
         }
         
         //  camera
@@ -86,7 +104,7 @@ class ActivityStart : AppCompatActivity() {
                 val audioShouldStartAtMs = start.mpStarts.last()
                 mps.last().setOnCompletionListener {
                     val delta = timer.time - duration - audioShouldStartAtMs
-                    sendFeedback?.invoke("delay: $delta ms", false)
+                    showFeedback?.invoke("delay: $delta ms")
                 }
             }
             mps.add(MediaPlayer.create(this, R.raw.whitenoise_point_001db)) //  needs to play non-silent audio for box
@@ -143,6 +161,7 @@ class ActivityStart : AppCompatActivity() {
         super.onDestroy()
         isBusy = false
         if(this::myCamera2.isInitialized) myCamera2.close()
+        if(this::gateMp.isInitialized) gateMp.release()
         mps.forEach { it.release() }
     }
 
@@ -151,7 +170,8 @@ class ActivityStart : AppCompatActivity() {
         const val DURATION_VIDEO_BEFORE_START = 3000L
 
         var startData: StartData? = null;private set
-        var sendFeedback:((String, Boolean)->Unit)? = null;private set
+        var broadcastFeedback:((String)->Unit)? = null;private set
+        var showFeedback:((String)->Unit)? = null;private set
         var isBusy = false;private set
 
         fun launch(activityHome: ActivityHome, startData: StartData) {
@@ -159,7 +179,8 @@ class ActivityStart : AppCompatActivity() {
 
             isBusy = true
             this.startData = startData
-            this.sendFeedback = activityHome::receiveFeedback
+            this.broadcastFeedback = activityHome::broadcastFeedback
+            this.showFeedback = activityHome::showFeedback
 
             activityHome.startActivity(Intent(activityHome, ActivityStart::class.java))
         }

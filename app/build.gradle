@@ -13,8 +13,8 @@ android {
         applicationId "com.ollivolland.lemaitre2"
         minSdk 26
         targetSdk 33
-        versionCode 5
-        versionName "5"
+        versionCode 6
+        versionName "6"
 
 //        testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -44,8 +44,6 @@ dependencies {
     implementation 'com.google.firebase:firebase-analytics-ktx'
     implementation 'com.google.firebase:firebase-crashlytics-ktx'
     implementation 'com.google.android.gms:play-services-location:21.0.1'
-
-//    implementation 'commons-net:commons-net:3.3'  //  wrong
 
 //    testImplementation 'junit:junit:4.13.2'
 //    androidTestImplementation 'androidx.test.ext:junit:1.1.3'

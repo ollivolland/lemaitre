@@ -8,7 +8,7 @@ import android.annotation.SuppressLint
 import android.app.AlertDialog
 import android.os.Bundle
 import android.view.View
-import android.widget.Button
+import android.widget.ImageButton
 import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.TimePicker
@@ -17,6 +17,7 @@ import datas.ClientData
 import datas.ConfigData
 import datas.HostData
 import datas.StartData
+import org.json.JSONObject
 import setString
 import wakelock.MyWakeLock
 import java.util.*
@@ -62,18 +63,15 @@ class ActivityHome : AppCompatActivity() {
             configClients = Array(data.clients.size) { i -> ConfigData(data.clients[i].name) }
 
             //  update
-            addSocketListener(data.mySockets) {
-                println("socket received ${it.take(100)}")
-                
-                Session.tryReceiveFeedback(it) { msg -> receiveFeedback(msg, false) }
+            addSocketListener(data.mySockets) { jo, tag ->
+                Session.tryReceiveFeedback(jo, tag) { msg -> showFeedback(msg) }
             }
             addSocketCloseListener(data.mySockets)
 
             //  ui
-            vConfig.visibility = View.VISIBLE
             vButtons.visibility = View.VISIBLE
-            val vStart = findViewById<Button>(R.id.home_bStart)
-            val vSchedule = findViewById<Button>(R.id.home_bSchedule)
+            val vStart = findViewById<ImageButton>(R.id.home_bStart)
+            val vSchedule = findViewById<ImageButton>(R.id.home_bSchedule)
     
             vSchedule.setOnClickListener {
                 val viewDialog = layoutInflater.inflate(R.layout.view_schedule, null)
@@ -90,7 +88,7 @@ class ActivityHome : AppCompatActivity() {
                         calendar[Calendar.SECOND] = 0
     
                         val start = StartData.create(calendar.timeInMillis, data.command, data.flavor, data.videoLength)
-                        Session.starts.add(start)
+                        Session.addStart(start)
                         start.send(data.mySockets) { log(it) }
                         
                         a.dismiss()
@@ -99,8 +97,8 @@ class ActivityHome : AppCompatActivity() {
             }
 
             vStart.setOnClickListener {
-                val start = StartData.create(MyTimer().time + data.delta, data.command, data.flavor, data.videoLength)
-                Session.starts.add(start)
+                val start = StartData.create(MyTimer.getTime() + data.delta, data.command, data.flavor, data.videoLength)
+                Session.addStart(start)
                 start.send(data.mySockets) { log(it) }
                 
                 vStart.isEnabled = false
@@ -153,7 +151,7 @@ class ActivityHome : AppCompatActivity() {
                 data.createDialog(this).setOnCancelListener {
                     updateViewGlobal(data)
 
-                    Session.currentConfig = configMe
+                    Session.config = configMe
                     configMe.dialog(this).setOnCancelListener {
                         viewConfigMe.updateView(configMe, "[host]")
 
@@ -167,10 +165,12 @@ class ActivityHome : AppCompatActivity() {
         else {
             val data = ClientData.get!!
     
-            addSocketListener(arrayOf(data.mySocket)) {
-                println("socket received ${it.take(100)}")
-                
-                Session.tryReceiveFeedback(it) { msg -> receiveFeedback(msg, false) }
+            viewConfigMe = ViewDevice(this, vConfig)
+            viewConfigMe.vTitle.text = data.deviceName
+            viewConfigMe.vSettings.visibility = View.GONE
+    
+            addSocketListener(arrayOf(data.mySocket)) { jo, tag ->
+                Session.tryReceiveFeedback(jo, tag) { msg -> showFeedback(msg) }
             }
             addSocketCloseListener(arrayOf(data.mySocket))
             
@@ -178,48 +178,64 @@ class ActivityHome : AppCompatActivity() {
         }
 
         //  blinker
-        thread {
+        thread(name = "blinkerUiThread") {
             while (isRunning) {
-                val should = if(MyTimer().time % 1000 <= 100) View.VISIBLE else View.INVISIBLE
+                val should = if(MyTimer.getTime() % 1000 <= 100) View.VISIBLE else View.INVISIBLE
                 if(vBlinker.visibility != should) runOnUiThread { vBlinker.visibility = should }
 
-                Thread.sleep(1)
+                Thread.sleep(10)
             }
         }
 
         //  check for starts
-        thread {
+        thread(name = "homeUiThread") {
             while (isRunning) {
                 Thread.sleep(50)
                 if(!isDialogsFinished) continue
                 
                 //  start starts
-                for (x in Session.starts)
-                    if(!ActivityStart.isBusy && !hasLaunched.contains(x.id) && x.timeOfInit < MyTimer().time + TIME_START)
+                for (x in Session.getStarts())
+                    if(!ActivityStart.isBusy && !hasLaunched.contains(x.id) && x.timeOfInit < MyTimer.getTime() + TIME_START)
                     {
                         hasLaunched.add(x.id)
                         ActivityStart.launch(this, x)
-                        receiveFeedback("[${Globals.FORMAT_TIME.format(x.timeOfInit)}] started\n", false)
+                        showFeedback("[${Globals.FORMAT_TIME.format(x.timeOfInit)}] started\n")
                         log("do $x")
                     }
 
                 //  feedback
-                val all = Session.starts.filter { !hasLaunched.contains(it.id) }
-                var feedback = if(all.isEmpty()) "no start scheduled"
+                val all = Session.getStarts().filter { !hasLaunched.contains(it.id) }
+                var feedback = "${Globals.FORMAT_TIME.format(MyTimer.getTime())}"
+                if(all.isEmpty()) feedback += "\nno start scheduled"
                 else {
-                    if(all.size == 1) "will start at ${Globals.FORMAT_TIME.format(all.minOf { it.timeOfInit })}"
-                    else "will start at ${Globals.FORMAT_TIME.format(all.minOf { it.timeOfInit })} (+${all.size} others)"
+                    if(all.size == 1) "\nwill start at ${Globals.FORMAT_TIME.format(all.minOf { it.timeOfInit })}"
+                    else "\nwill start at ${Globals.FORMAT_TIME.format(all.minOf { it.timeOfInit })} (+${all.size} others)"
                 }
-                if(GpsTime.numObservations < MIN_OBSERVATIONS) feedback = "NO GPS CONNECTION\n$feedback"
+                if(GpsTime.numObservations < MIN_OBSERVATIONS) feedback += "\nDEVICE HAS NO GPS CONNECTION"
+                else if(Session.state == SessionState.HOST && HostData.get!!.isHasGpsTime.any{ !it }) feedback += "\nCLIENT HAS NO GPS CONNECTION"
                 
                 runOnUiThread {
-                    vFeedback.setString("$feedback\n\n\n${feedbacks.reversed().joinToString("\n")}")
-                }
-                
-                //  host configs
-                if(Session.state == SessionState.HOST) {
-                    for(i in configClients.indices)
-                        updateClient(i)
+                    synchronized(feedbacks) {
+                        vFeedback.setString("$feedback\n\n\n${feedbacks.reversed().joinToString("\n")}")
+                    }
+                    
+                    //  host configs
+                    synchronized(configClients) {
+                        if (Session.state == SessionState.HOST) {
+                            for (i in configClients.indices)
+                                updateClient(i, HostData.get!!)
+                        }
+                    }
+                    
+                    //  client config
+                    if(Session.state == SessionState.CLIENT)
+                        viewConfigMe.updateView(Session.config,
+                            when {
+                                !ClientData.get!!.isHasHostGps || !MyTimer.isHasGpsTime() -> "[NOGPS]"
+                                MyTimer.getTime() - ClientData.get!!.lastUpdate < TIME_CONNECTION_TIMEOUT -> "[connected]"
+                                else -> "[DISCONNECTED]"
+                            }
+                        )
                 }
             }
         }
@@ -231,7 +247,7 @@ class ActivityHome : AppCompatActivity() {
         GpsTime.unregister()
         wakeLock.release()
         
-        for(x in socketReadListeners) x.first.removeOnRead(x.second)
+        for(x in socketReadListeners) x.first.removeOnJson(x.second)
         for(x in socketCloseListeners) x.first.removeOnClose(x.second)
     }
     
@@ -240,18 +256,23 @@ class ActivityHome : AppCompatActivity() {
         viewGlobal.vDesc.setString("flavor:${data.flavor/1000}s length:${data.videoLength/1000}s Δ:+${data.delta/1000}s")
     }
     
-    private fun updateClient(i:Int) {
-        viewConfigClients[i].updateView(configClients[i], if(MyTimer().time - HostData.get!!.lastUpdate[i] < TIME_CONNECTION_TIMEOUT) "[connected]" else "[DISCONNECTED]")
+    private fun updateClient(i:Int, data: HostData) {
+        viewConfigClients[i].updateView(configClients[i], when {
+                !data.isHasGpsTime[i] || !MyTimer.isHasGpsTime()                 -> "[NOGPS]"
+                MyTimer.getTime() - data.lastUpdate[i] < TIME_CONNECTION_TIMEOUT -> "[connected]"
+                else -> "[DISCONNECTED]"
+            }
+        )
     }
 
-    private fun addSocketListener(sockets: Array<MySocket>, action:(String) -> Unit) {
+    private fun addSocketListener(sockets: Array<MySocket>, action:(jo:JSONObject, tag:String) -> Unit) {
         for (x in sockets)
-            socketReadListeners.add(Pair(x, x.addOnReadIndex(action)))
+            socketReadListeners.add(Pair(x, x.addOnJson(action)))
     }
     
     private fun addSocketCloseListener(sockets: Array<MySocket>) {
         for (x in sockets)
-            socketCloseListeners.add(Pair(x, x.addOnCloseIndex { log("[${x.port}] SOCKET CLOSED") }))
+            socketCloseListeners.add(Pair(x, x.addOnClose { log("[${x.port}] SOCKET CLOSED") }))
     }
 
     private fun log(string: String) {
@@ -262,11 +283,11 @@ class ActivityHome : AppCompatActivity() {
         }
     }
     
-    fun receiveFeedback(string: String, isBroadCast:Boolean) {
-        feedbacks.add(string)
-        
-        if(!isBroadCast) return
-        
+    fun showFeedback(string: String) {
+        synchronized(feedbacks) { feedbacks.add(string) }
+    }
+    
+    fun broadcastFeedback(string: String) {
         if(Session.state == SessionState.HOST) {
             HostData.get!!.mySockets.forEach {
                 Session.sendFeedback(it, string)
@@ -279,6 +300,6 @@ class ActivityHome : AppCompatActivity() {
 
     companion object {
         const val TIME_START = 3_000L
-        const val TIME_CONNECTION_TIMEOUT = 3_000L
+        const val TIME_CONNECTION_TIMEOUT = 5_000L
     }
 }

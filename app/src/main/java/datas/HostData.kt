@@ -1,6 +1,7 @@
 package datas
 
 import Client
+import MyTimer
 import android.app.Dialog
 import android.content.Context
 import android.widget.Spinner
@@ -9,11 +10,14 @@ import com.ollivolland.lemaitre2.MyClientThread
 import com.ollivolland.lemaitre2.MySocket
 import com.ollivolland.lemaitre2.R
 import config
+import org.json.JSONObject
 import setString
+import kotlin.concurrent.thread
 
 class HostData private constructor(val hostName:String, val clients: Array<Client>) {
     val mySockets:Array<MySocket> = Array(clients.size) { i -> MyClientThread(clients[i].ipWifiP2p, clients[i].port) }
     val lastUpdate:Array<Long> = Array(clients.size) { 0 }
+    val isHasGpsTime:Array<Boolean> = Array(clients.size) { false }
     var command:String = COMMAND_CHOICES[0]
     var flavor:Long = FLAVOR_CHOICES[0]
     var delta:Long = DELTA_CHOICES[0]
@@ -22,16 +26,33 @@ class HostData private constructor(val hostName:String, val clients: Array<Clien
 
     init {
         //  launch home
-        for (x in mySockets) x.write("fin")
+        for (x in mySockets) x.write(JSONObject(), JSON_TAG_LAUNCH)
         
-        //  update
+        //  reads
         for (i in mySockets.indices)
-            mySockets[i].addOnRead {
-                try {
-                    if (it.startsWith("update=")) lastUpdate[i] = it.removePrefix("update=").toLong()
+            mySockets[i].addOnJson { jo, tag ->
+                println("socket[$i] received $tag")
+                
+                //  update
+                if (tag == JSON_TAG_UPDATE) {
+                    synchronized(lastUpdate) { lastUpdate[i] = jo["time"].toString().toLong() }
+                    synchronized(isHasGpsTime) { isHasGpsTime[i] = jo["isHasGps"].toString().toBoolean() }
                 }
-                catch (_:Exception) {}
             }
+    
+    
+        //  host update clients
+        thread(name = "socketHostDataSendUpdate") {
+            while (mySockets.any { it.isOpen }) {
+                for (x in mySockets.filter { it.isOpen })
+                    x.write(JSONObject().apply {
+                        accumulate("time", MyTimer.getTime())
+                        accumulate("isHasGps", MyTimer.isHasGpsTime())
+                    }, JSON_TAG_UPDATE)
+            
+                Thread.sleep(1000)
+            }
+        }
     }
     
     fun createDialog(context:Context):Dialog {
@@ -55,6 +76,9 @@ class HostData private constructor(val hostName:String, val clients: Array<Clien
     }
 
     companion object {
+        const val JSON_TAG_UPDATE = "update"
+        const val JSON_TAG_LAUNCH = "fin"
+        
         const val COMMAND_KURZ = "kKurz"
         const val COMMAND_MITTEL = "kMittel"
         const val COMMAND_LANG = "kLang"
@@ -62,11 +86,11 @@ class HostData private constructor(val hostName:String, val clients: Array<Clien
         val COMMAND_CHOICES = arrayOf(COMMAND_KURZ, COMMAND_MITTEL, COMMAND_LANG, COMMAND_BIEP)
         val COMMAND_DESCRIPTIONS = arrayOf("Wettkampf 1-2s", "Wettkampf 2-3s", "Wettkampf 3-4s", "Biep")
         val FLAVOR_CHOICES = arrayOf(10_000L, 20_000L, 30_000L)
-        val FLAVOR_DESCRIPTIONS = arrayOf("10s", "20s", "30s")
+        val FLAVOR_DESCRIPTIONS = arrayOf("flavor 10s", "flavor 20s", "flavor 30s")
         val DURATION_CHOICES = arrayOf(10_000L, 30_000L, 60_000L)
         val DURATION_DESCRIPTIONS = arrayOf("duration 10s", "duration 30s", "duration 60s")
         val DELTA_CHOICES = arrayOf(3_000L, 10_000L, 60_000L)
-        val DELTA_DESCRIPTIONS = arrayOf("3s", "10s", "60s")
+        val DELTA_DESCRIPTIONS = arrayOf("Δ3s", "Δ10s", "Δ60s")
 
         var get: HostData? = null; private set
 

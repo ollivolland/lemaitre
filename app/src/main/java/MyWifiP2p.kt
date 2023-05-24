@@ -9,7 +9,6 @@ import android.net.wifi.p2p.WifiP2pDevice
 import android.net.wifi.p2p.WifiP2pManager
 import android.net.wifi.p2p.nsd.WifiP2pDnsSdServiceInfo
 import android.net.wifi.p2p.nsd.WifiP2pDnsSdServiceRequest
-import android.widget.Toast
 import com.ollivolland.lemaitre2.MainActivity
 import com.ollivolland.lemaitre2.MyClientThread
 import com.ollivolland.lemaitre2.MyServerThread
@@ -56,19 +55,17 @@ class MyWifiP2p(private val activity: MainActivity) {
 						
 						this.write(JSONObject().apply {
 							accumulate("useport", port)
-						}.toString())
+						}, JSON_TAG_CONFIG)
 					}
-					addOnRead { s ->
-						val jo = JSONObject(s)
+					addOnJson { jo, tag ->
+						if (tag != JSON_TAG_CLIENT_REPLY) return@addOnJson
 						
-						if (jo.has("name")) {
-							val client = Client(ip, port, jo["name"] as String)
-							clients.add(client)
-//							activity.runOnUiThread { Toast.makeText(activity, "connected ${client.name}", Toast.LENGTH_LONG).show() }
-							log("client ${client.name} on [$port] => $ip")
-							
-							this.close()
-						}
+						val client = Client(ip, port, jo["name"] as String)
+						clients.add(client)
+						//  activity.runOnUiThread { Toast.makeText(activity, "connected ${client.name}", Toast.LENGTH_LONG).show() }
+						log("client ${client.name} on [$port] => $ip")
+						
+						this.close()
 					}
 					addOnClose {
 						isFormationSocketReady=true
@@ -96,19 +93,17 @@ class MyWifiP2p(private val activity: MainActivity) {
 			
 			if(Session.state ==  SessionState.CLIENT && !this::mySocketFormation.isInitialized && info.groupOwnerAddress.hostAddress != null) {
 				mySocketFormation = MyClientThread(info.groupOwnerAddress.hostAddress!!, MainActivity.PORT_FORMATION).apply {
-					addOnRead { s ->
-						val jo = JSONObject(s)
+					addOnJson { jo, tag ->
+						if(tag != JSON_TAG_CONFIG) return@addOnJson
 						
-						if(jo.has("useport")) {
-							this.write(JSONObject().apply {
-								accumulate("name", deviceName)
-							}.toString())
-							this.close()
-							
-							ClientData.set(jo["useport"] as Int, hostMac, deviceName, activity)
-							log("host = ${ClientData.get!!.port}")
-//							activity.runOnUiThread { Toast.makeText(activity, "connected to host", Toast.LENGTH_LONG).show() }
-						}
+						this.write(JSONObject().apply {
+							accumulate("name", deviceName)
+						}, JSON_TAG_CLIENT_REPLY)
+						this.close()
+						
+						ClientData.set(jo["useport"] as Int, hostMac, deviceName, activity)
+						log("host = ${ClientData.get!!.port}")
+						//  activity.runOnUiThread { Toast.makeText(activity, "connected to host", Toast.LENGTH_LONG).show() }
 					}
 					log{ s -> log(s) }
 				}
@@ -189,6 +184,11 @@ class MyWifiP2p(private val activity: MainActivity) {
 		manager.clearLocalServices(channel, MyWifiP2pActionListener("clearLocalServices"))
 		manager.clearServiceRequests(channel, MyWifiP2pActionListener("clearServiceRequests"))
 		manager.stopPeerDiscovery(channel, MyWifiP2pActionListener("stopPeerDiscovery"))
+	}
+	
+	companion object {
+		const val JSON_TAG_CONFIG = "wifip2pconfig"
+		const val JSON_TAG_CLIENT_REPLY = "wifip2preply"
 	}
 }
 

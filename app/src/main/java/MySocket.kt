@@ -1,5 +1,6 @@
 package com.ollivolland.lemaitre2
 
+import org.json.JSONObject
 import java.io.InputStream
 import java.io.OutputStream
 import java.net.InetSocketAddress
@@ -13,16 +14,47 @@ abstract class MySocket(val port: Int, private val type:String) {
     private val executor: ExecutorService = Executors.newSingleThreadExecutor()
     private val myOnSocketListener = mutableListOf<((Socket) -> Unit)?>()
     private val myOnCloseListeners = mutableListOf<(() -> Unit)?>()
-    protected val myOnReadListeners = mutableListOf<((String) -> Unit)?>()
+    private val myOnJSONListeners = mutableListOf<((jo:JSONObject, tag:String) -> Unit)?>()
     private lateinit var mOutputStream: OutputStream
-    protected lateinit var mInputStream: InputStream
-    protected var isInputOpen = true
+    private lateinit var mInputStream: InputStream
+    private var isInputOpen = true
     protected lateinit var socket: Socket
     private var isSocketConfigured = false
     var isOpen = true;protected set
     
     init {
     	println("[$port] $type creating")
+    }
+    
+    private fun receiveFromInputStream() {
+        val buffer = ByteArray(1024)
+        var length:Int
+        
+        //  read
+        while(isOpen) {
+            try {
+                length = mInputStream.read(buffer)
+                if(length < 0) continue
+    
+                //  listeners
+                if(myOnJSONListeners.isNotEmpty()) {
+                    try {
+                        val jo = JSONObject(String(buffer, 0, length))
+                        val tag = jo["tag"].toString()
+            
+                        for (x in myOnJSONListeners)
+                            try { x?.invoke(jo, tag) }
+                            catch (e:Exception) { e.printStackTrace() }
+                    } catch (_:Exception) { }
+                }
+            } catch (e:Exception) {
+                e.printStackTrace()
+                isOpen = false
+            }
+        }
+    
+        //  wait for input to close
+        while (isInputOpen) Thread.sleep(1)
     }
 
     fun log(f:(String)->Unit) {
@@ -31,7 +63,9 @@ abstract class MySocket(val port: Int, private val type:String) {
         myOnCloseListeners.add { f("[$port] $type closed") }
     }
 
-    fun write(s:String) = write(s.encodeToByteArray())
+    fun write(jo:JSONObject, tag:String) = write(jo.apply {
+        accumulate("tag", tag)
+    }.toString().encodeToByteArray())
     private fun write(byteArray: ByteArray) {
         if(!isOpen) return
         if(!this::mOutputStream.isInitialized) {
@@ -48,14 +82,14 @@ abstract class MySocket(val port: Int, private val type:String) {
         }
     }
     
-    protected fun myClose() {
+    protected fun finish() {
         socket.close()
         
         println("[$port] $type closed")
         for (x in myOnCloseListeners) x?.invoke()
     }
     
-    protected fun mySocket() {
+    protected fun setSocketConfigured() {
         if(isSocketConfigured) throw Exception()
         
         isSocketConfigured = true
@@ -64,6 +98,9 @@ abstract class MySocket(val port: Int, private val type:String) {
         
         println("[$port] $type created ${socket.localAddress.hostAddress} => ${socket.inetAddress.hostAddress}")
         for (x in myOnSocketListener) x?.invoke(socket)
+        
+        //  now read
+        receiveFromInputStream()
     }
 
     fun close() {
@@ -76,24 +113,17 @@ abstract class MySocket(val port: Int, private val type:String) {
         myOnSocketListener.add(action)
     }
     
-    fun addOnCloseIndex(action:() -> Unit):Int {
+    fun addOnClose(action:() -> Unit):Int {
         myOnCloseListeners.add(action)
         return myOnCloseListeners.lastIndex
     }
-    fun addOnClose(action:() -> Unit) = myOnCloseListeners.add(action)
-    
-    fun removeOnClose(i: Int) {
-        myOnCloseListeners[i] = null
-    }
+    fun removeOnClose(i: Int) { myOnCloseListeners[i] = null }
 
-    fun addOnReadIndex(action:(String) -> Unit):Int {
-        myOnReadListeners.add(action)
-        return myOnReadListeners.lastIndex
+    fun addOnJson(action: (jo:JSONObject, tag:String) -> Unit):Int {
+        myOnJSONListeners.add(action)
+        return myOnJSONListeners.lastIndex
     }
-    fun addOnRead(action:(String) -> Unit) = myOnReadListeners.add(action)
-    fun removeOnRead(i: Int) {
-        myOnReadListeners[i] = null
-    }
+    fun removeOnJson(index:Int) { myOnJSONListeners[index] = null }
 }
 
 class MyClientThread(private val inetAddress: String, port: Int): MySocket(port, "client") {
@@ -102,31 +132,11 @@ class MyClientThread(private val inetAddress: String, port: Int): MySocket(port,
         
         thread {
             socket.connect(InetSocketAddress(inetAddress, port), 3000)
-            mySocket()
-
-            val buffer = ByteArray(1024)
-            var length:Int
-            while(isOpen) {
-                try {
-                    length = mInputStream.read(buffer)
-
-                    if (length > 0) {
-                        val s = String(buffer, 0, length)
     
-                        for (x in myOnReadListeners)
-                            try { x?.invoke(s) }
-                            catch (e:Exception) { e.printStackTrace() }
-                    }
-                } catch (e:Exception) {
-                    e.printStackTrace()
-                    isOpen = false
-                }
-            }
+            setSocketConfigured()
 
-            while (isInputOpen) Thread.sleep(1)
-//            Thread.sleep(100)
-
-            myClose()
+//          Thread.sleep(100)
+            finish()
         }
     }
 }
@@ -137,31 +147,11 @@ class MyServerThread(port:Int): MySocket(port, "server") {
     init {
         thread {
             socket  = serverSocket.accept()
-            mySocket()
-
-            val buffer = ByteArray(1024)
-            var length:Int
-            while(isOpen) {
-                try {
-                    length = mInputStream.read(buffer)
-
-                    if (length > 0) {
-                        val s = String(buffer, 0, length)
-
-                        for (x in myOnReadListeners)
-                            try { x?.invoke(s) }
-                            catch (e:Exception) { e.printStackTrace() }
-                    }
-                } catch (e:Exception) {
-                    e.printStackTrace()
-                    isOpen = false
-                }
-            }
-
-            while (isInputOpen) Thread.sleep(1)
+    
+            setSocketConfigured()
 
             serverSocket.close()
-            myClose()
+            finish()
         }
     }
 }

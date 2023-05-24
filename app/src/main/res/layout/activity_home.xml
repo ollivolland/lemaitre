@@ -29,7 +29,6 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="vertical"
-            android:visibility="gone"
             />
 
         <LinearLayout
@@ -42,23 +41,25 @@
             android:visibility="gone"
             >
 
-            <Button
+            <ImageButton
                 android:id="@+id/home_bStart"
                 android:layout_width="100dp"
                 android:layout_height="100dp"
-                android:text="start"
-                android:textSize="10sp"
-                android:src="@drawable/ic_launcher_foreground"
+                android:padding="27dp"
+                android:src="@drawable/sharp_play_arrow_white_24"
+                android:scaleType="fitCenter"
+                android:background="@drawable/background_button"
                 />
 
-            <Button
+            <ImageButton
                 android:id="@+id/home_bSchedule"
                 android:layout_width="100dp"
                 android:layout_height="100dp"
                 android:layout_marginStart="50dp"
-                android:textSize="10sp"
-                android:text="schedule"
-                android:src="@drawable/ic_launcher_foreground"
+                android:padding="27dp"
+                android:src="@drawable/sharp_alarm_white_24"
+                android:scaleType="fitCenter"
+                android:background="@drawable/background_button"
                 />
 
         </LinearLayout>
@@ -80,7 +81,6 @@
             android:layout_height="wrap_content"
             android:layout_marginTop="20dp"
             android:padding="20dp"
-            android:text="Hello World!"
             android:textSize="10sp"
             android:textAlignment="viewStart"
             />

@@ -27,12 +27,11 @@ import kotlin.concurrent.thread
 
 class MainActivity : AppCompatActivity() {
     //  by urgency
-    //  todo    net time
+    //  todo    thread safety
     //  todo    audioTrack instead of MediaPlayer   https://stackoverflow.com/questions/12263671/audiotrack-android-playing-sounds-from-raw-folder
     //  todo    host send delay&gate, display only once both received
     //  todo    microphone
     
-    //  todo    schedule
     //  todo    video timestamp
     //  todo    display images
     //  todo    stop start

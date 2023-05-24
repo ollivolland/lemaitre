@@ -33,7 +33,7 @@ class Analyzer(private val context: Context, myCamera2: MyCamera2, private val m
 	private var isHasStreakStarted = false
 	private var streakMaxBroken = 0
 	val onStreakStartedListeners = mutableListOf<(Long)->Unit>()
-	val onTriangulatedListeners = mutableListOf<(Long,Long)->Unit>()
+	val onTriangulatedListeners = mutableListOf<(triangleMs:Long,frameMs:Long,deltas:Double)->Unit>()
 	
 	private val listenTo = ImageReader.OnImageAvailableListener {
 		val image = it.acquireLatestImage() ?: return@OnImageAvailableListener
@@ -177,7 +177,7 @@ class Analyzer(private val context: Context, myCamera2: MyCamera2, private val m
 				if (numDeltas.absoluteValue >= 5) timeTriangleMs = 0
 
 				thread {
-					for (x in onTriangulatedListeners) x(timeTriangleMs, timeFrameMS)
+					for (x in onTriangulatedListeners) x(timeTriangleMs, timeFrameMS, numDeltas)
 				}
 
 				println(

@@ -32,6 +32,6 @@ class ViewDevice(activity: Activity, viewGroup: ViewGroup) {
 		if(configData.isCamera) has.add("camera")
 		if(configData.isGate) has.add("gate")
 		
-		vDesc.text = "$desc ${has.joinToString("&")}"
+		vDesc.text = "$desc   ${has.joinToString("&")}"
 	}
 }

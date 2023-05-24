@@ -1,6 +1,5 @@
 package datas
 
-import ViewDevice
 import android.app.Dialog
 import android.content.Context
 import android.view.View
@@ -9,6 +8,7 @@ import android.widget.TextView
 import com.google.android.material.switchmaterial.SwitchMaterial
 import com.ollivolland.lemaitre2.MySocket
 import com.ollivolland.lemaitre2.R
+import com.ollivolland.lemaitre2.Session
 import config
 import org.json.JSONObject
 
@@ -34,7 +34,7 @@ class ConfigData(val deviceName:String, private val isHost:Boolean = false) {
 
         vTitle.text = deviceName
 
-        vSpinnerFps.config(FPS_DESCRITPTIONS, FPS_CHOICES.indexOf(fps)) { i -> fps = FPS_CHOICES[i] }
+        vSpinnerFps.config(FPS_DESCRIPTIONS, FPS_CHOICES.indexOf(fps)) { i -> fps = FPS_CHOICES[i] }
         vSpinnerFps.visibility = if(isCamera) View.VISIBLE else View.GONE
         
         vSwitchCommand.isChecked = isCommand
@@ -77,7 +77,7 @@ class ConfigData(val deviceName:String, private val isHost:Boolean = false) {
             accumulate("isCamera", isCamera)
             accumulate("isGate", isGate)
             accumulate("fps", fps)
-        }.toString())
+        }, JSON_TAG)
         
         action?.invoke("sent config $this")
     }
@@ -88,21 +88,17 @@ class ConfigData(val deviceName:String, private val isHost:Boolean = false) {
 
     companion object {
         val FPS_CHOICES = arrayOf(30, 60, 100)
-        val FPS_DESCRITPTIONS = arrayOf("30 fps", "60 fps", "100 fps")
+        val FPS_DESCRIPTIONS = arrayOf("30 fps", "60 fps", "100 fps")
+        const val JSON_TAG = "config"
 
-        fun tryReceive(deviceName: String, s:String, action:(ConfigData)->Unit) {
-            val jo = JSONObject(s)
-            if(jo.has("isCommand")
-                && jo.has("isCamera")
-                && jo.has("isGate")
-                && jo.has("fps"))
-            {
-                action(ConfigData(deviceName).apply{
-                    isCommand = jo["isCommand"] as Boolean
-                    isCamera = jo["isCamera"] as Boolean
-                    isGate = jo["isGate"] as Boolean
-                    fps = jo["fps"] as Int
-                })
+        fun tryReceive(jo:JSONObject, tag:String, deviceName: String) {
+            if(tag != JSON_TAG) return
+            
+            Session.config = ConfigData(deviceName).apply {
+                isCommand = jo["isCommand"] as Boolean
+                isCamera = jo["isCamera"] as Boolean
+                isGate = jo["isGate"] as Boolean
+                fps = jo["fps"] as Int
             }
         }
     }

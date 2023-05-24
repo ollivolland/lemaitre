@@ -13,5 +13,12 @@ class MyTimer {
     
     companion object {
         const val MIN_OBSERVATIONS = 3
+        
+        fun getTime():Long {
+            return if(GpsTime.numObservations < MIN_OBSERVATIONS) return System.currentTimeMillis()
+            else GpsTime.timeOfBoot + SystemClock.elapsedRealtime()
+        }
+        
+        fun isHasGpsTime(): Boolean = GpsTime.numObservations >= MIN_OBSERVATIONS
     }
 }

@@ -7,7 +7,7 @@ import com.ollivolland.lemaitre2.Session
 import org.json.JSONObject
 
 data class StartData(val id:Long, val timeOfInit:Long, val timeToCommand: Long, val videoLength: Long, val mpStartsBuild:String, val mpIdsBuild:String) {
-    val config: ConfigData = Session.currentConfig.copy()
+    val config: ConfigData = Session.config
 
     fun send(mySockets: Array<MySocket>, action:((String) -> Unit)? = null) {
         for (x in mySockets)
@@ -18,7 +18,7 @@ data class StartData(val id:Long, val timeOfInit:Long, val timeToCommand: Long, 
                 accumulate("videoLength", videoLength)
                 accumulate("mpStarts", mpStartsBuild)
                 accumulate("mps", mpIdsBuild)
-            }.toString())
+            }, JSON_TAG)
         
         action?.invoke("sent start $this")
     }
@@ -33,6 +33,7 @@ data class StartData(val id:Long, val timeOfInit:Long, val timeToCommand: Long, 
     companion object {
         private const val DURATION_FERTIG_MS:Long = 700
         private const val DURATION_TO_SHOT_MS:Long = 20
+        const val JSON_TAG = "start"
 
         fun create(timeStamp: Long, command:String, flavor: Long, videoLength: Long): StartData {
             val builder = Mp3Builder()
@@ -62,26 +63,17 @@ data class StartData(val id:Long, val timeOfInit:Long, val timeToCommand: Long, 
             return StartData(System.currentTimeMillis(), timeStamp, builder.lastEndMs, videoLength, builder.getBuiltDeltas(timeStamp), builder.getBuiltIds())
         }
 
-        fun tryReceive(s:String, action:(StartData)->Unit) {
-            val jo = JSONObject(s)
-            if(jo.has("id")
-                && jo.has("timeStamp")
-                && jo.has("commandLength")
-                && jo.has("videoLength")
-                && jo.has("mpStarts")
-                && jo.has("mps"))
-            {
-                action(
-                    StartData(
-                        jo["id"].toString().toLong(),
-                        jo["timeStamp"].toString().toLong(),
-                        jo["commandLength"].toString().toLong(),
-                        jo["videoLength"].toString().toLong(),
-                        jo["mpStarts"].toString(),
-                        jo["mps"].toString(),
-                    )
-                )
-            }
+        fun tryReceive(jo:JSONObject, tag:String) {
+            if(tag != JSON_TAG) return
+    
+            Session.addStart(StartData(
+                jo["id"].toString().toLong(),
+                jo["timeStamp"].toString().toLong(),
+                jo["commandLength"].toString().toLong(),
+                jo["videoLength"].toString().toLong(),
+                jo["mpStarts"].toString(),
+                jo["mps"].toString(),
+            ))
         }
     }
 }

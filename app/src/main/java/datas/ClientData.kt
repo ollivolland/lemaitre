@@ -7,48 +7,51 @@ import com.ollivolland.lemaitre2.MainActivity
 import com.ollivolland.lemaitre2.MyServerThread
 import com.ollivolland.lemaitre2.MySocket
 import com.ollivolland.lemaitre2.Session
-import com.ollivolland.lemaitre2.SessionState
+import org.json.JSONObject
 import kotlin.concurrent.thread
 
-class ClientData private constructor(val port: Int, val hostMac:String, val deviceName:String, private val mainActivity: MainActivity?) {
+class ClientData private constructor(val port: Int, val hostMac:String, val deviceName:String, private var mainActivity: MainActivity?) {
     val mySocket: MySocket
-    private var sentLastUpdate = 0L
+    var lastUpdate = MyTimer.getTime()
+    var isHasHostGps = false
 
     init {
         mySocket = MyServerThread(port)
         mySocket.log { s -> mainActivity?.log(s) }
         
         //  launch host
-        var finReaderIndex = -1
-        finReaderIndex = mySocket.addOnReadIndex { s ->
-            if(s == "fin") {
-                mySocket.removeOnRead(finReaderIndex)
-                mainActivity!!.startActivity(Intent(mainActivity, ActivityHome::class.java))
-                mainActivity.finish()
+        mySocket.addOnJson { jo, tag ->
+            println("socket received $tag")
+            
+            //  launch
+            if(mainActivity != null && tag == HostData.JSON_TAG_LAUNCH) {
+                mainActivity?.startActivity(Intent(mainActivity, ActivityHome::class.java))
+                mainActivity?.finish()
+                mainActivity = null
             }
-        }
-        
-        //  readers
-        mySocket.addOnRead {
-            ConfigData.tryReceive(deviceName, it) { cfg ->
-//                log("received config = $cfg")
-                Session.currentConfig = cfg
-            }
-            StartData.tryReceive(it) { cfg ->
-//                log("received start = $cfg")
-                Session.starts.add(cfg)
+            
+            //  config
+            ConfigData.tryReceive(jo, tag, deviceName)
+            
+            //  start
+            StartData.tryReceive(jo, tag)
+            
+            //  update
+            if (tag == HostData.JSON_TAG_UPDATE) {
+                lastUpdate = jo["time"].toString().toLong()
+                isHasHostGps = jo["isHasGps"].toString().toBoolean()
             }
         }
     
         //  client update host
-        thread {
+        thread(name = "socketClientDataSendUpdate") {
             while (mySocket.isOpen) {
-                if(MyTimer().time > sentLastUpdate + 1000) {
-                    sentLastUpdate = MyTimer().time
-                    mySocket.write("update=${sentLastUpdate}")
-                }
+                mySocket.write(JSONObject().apply {
+                    accumulate("time", MyTimer.getTime())
+                    accumulate("isHasGps", MyTimer.isHasGpsTime())
+                }, HostData.JSON_TAG_UPDATE)
                 
-                Thread.sleep(20)
+                Thread.sleep(1000)
             }
         }
     }

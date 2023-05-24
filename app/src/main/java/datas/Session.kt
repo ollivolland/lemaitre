@@ -6,26 +6,32 @@ import org.json.JSONObject
 
 class Session {
     companion object {
-        var state: SessionState = SessionState.NONE
-        val starts = mutableListOf<StartData>()
-        var currentConfig: ConfigData = ConfigData("null")
+        private const val JSON_TAG_FEEDBACK = "feedback"
+        
+        private var mState: SessionState = SessionState.NONE
+        private val mStarts = mutableListOf<StartData>()
+        private var mConfig: ConfigData = ConfigData("null")
+        var state:SessionState
+            set(value) { synchronized(mState) { mState = value } }
+            get() { synchronized(mState) { return mState } }
+        var config:ConfigData
+            set(value) { synchronized(mConfig) { mConfig = value } }
+            get() { synchronized(mConfig) { return mConfig.copy() } }
         
         fun sendFeedback(mySocket: MySocket, string:String) {
             mySocket.write(JSONObject().apply {
-                accumulate("key", KEY_FEEDBACK)
                 accumulate("msg", string)
-            }.toString())
+            }, JSON_TAG_FEEDBACK)
         }
         
-        fun tryReceiveFeedback(string: String, action:(String)->Unit) {
-            if(string.contains("\"key\":\"$KEY_FEEDBACK\"")) {
-                val jo = JSONObject(string)
-
-                if (jo.has("msg")) action(jo["msg"].toString())
-            }
+        fun tryReceiveFeedback(jo:JSONObject, tag:String, action:(String)->Unit) {
+            if(tag != JSON_TAG_FEEDBACK) return
+            
+            action(jo["msg"].toString())
         }
         
-        const val KEY_FEEDBACK = "feedback"
+        fun addStart(data: StartData) { synchronized(mStarts) { mStarts.add(data) } }
+        fun getStarts():Array<StartData> { synchronized(mStarts) { return mStarts.toTypedArray() } }
     }
 }
 enum class SessionState { NONE, HOST, CLIENT }

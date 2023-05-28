@@ -9,6 +9,7 @@ import android.widget.TextView
 import com.ollivolland.lemaitre2.MyClientThread
 import com.ollivolland.lemaitre2.MySocket
 import com.ollivolland.lemaitre2.R
+import com.ollivolland.lemaitre2.Session
 import config
 import org.json.JSONObject
 import setString
@@ -18,6 +19,7 @@ class HostData private constructor(val hostName:String, val clients: Array<Clien
     val mySockets:Array<MySocket> = Array(clients.size) { i -> MyClientThread(clients[i].ipWifiP2p, clients[i].port) }
     val lastUpdate:Array<Long> = Array(clients.size) { 0 }
     val isHasGpsTime:Array<Boolean> = Array(clients.size) { false }
+    private val configClients:Array<ConfigData>
     var command:String = COMMAND_CHOICES[0]
     var flavor:Long = FLAVOR_CHOICES[0]
     var delta:Long = DELTA_CHOICES[0]
@@ -25,6 +27,10 @@ class HostData private constructor(val hostName:String, val clients: Array<Clien
     var isInit = false
 
     init {
+        //  set configs
+        Session.config = ConfigData(hostName, true)
+        configClients = Array(clients.size) { i -> ConfigData(clients[i].name) }
+        
         //  launch home
         for (x in mySockets) x.write(JSONObject(), JSON_TAG_LAUNCH)
         
@@ -52,6 +58,19 @@ class HostData private constructor(val hostName:String, val clients: Array<Clien
             
                 Thread.sleep(1000)
             }
+        }
+    }
+    
+    fun setClientConfig(i:Int, config: ConfigData, onSent:((String)->Unit)? = null) {
+        synchronized(configClients) {
+            configClients[i] = config
+            configClients[i].send(mySockets[i], onSent)
+        }
+    }
+    
+    fun getClientConfigs(): Array<ConfigData> {
+        synchronized(configClients) {
+            return configClients.toList().toTypedArray()
         }
     }
     
@@ -94,7 +113,7 @@ class HostData private constructor(val hostName:String, val clients: Array<Clien
 
         var get: HostData? = null; private set
 
-        fun set(hostName: String, clients: MutableList<Client>){
+        fun set(hostName: String, clients: MutableList<Client>) {
             if(ClientData.get != null) throw Exception()
             
             get = HostData(hostName, clients.toTypedArray())

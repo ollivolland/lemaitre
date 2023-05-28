@@ -10,12 +10,14 @@ import datas.ConfigData
 class ViewDevice(activity: Activity, viewGroup: ViewGroup) {
 	val root: View
 	val vTitle: TextView
+	val vError: TextView
 	val vDesc: TextView
 	val vSettings: ImageButton
 	
 	init {
 		root = activity.layoutInflater.inflate(R.layout.view_device, viewGroup, false)
 		vTitle = root.findViewById(R.id.device_tTitle)
+		vError = root.findViewById(R.id.device_tError)
 		vDesc = root.findViewById(R.id.device_tDesc)
 		vSettings = root.findViewById(R.id.device_bSettings)
 		viewGroup.addView(root)
@@ -26,12 +28,13 @@ class ViewDevice(activity: Activity, viewGroup: ViewGroup) {
 		updateView(configData, desc)
 	}
 	
-	fun updateView(configData: ConfigData, desc:String) {
+	fun updateView(configData: ConfigData, desc:String, error:String = "") {
 		val has = mutableListOf<String>()
 		if(configData.isCommand) has.add("command")
 		if(configData.isCamera) has.add("camera")
 		if(configData.isGate) has.add("gate")
 		
+		vError.text = error
 		vDesc.text = "$desc   ${has.joinToString("&")}"
 	}
 }

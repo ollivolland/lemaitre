@@ -33,7 +33,6 @@ class ActivityHome : AppCompatActivity() {
     private lateinit var viewGlobal:ViewDevice
     private lateinit var viewConfigMe:ViewDevice
     private lateinit var viewConfigClients:Array<ViewDevice>
-    private lateinit var configClients:Array<ConfigData>
     private val hasLaunched = mutableListOf<Long>()
     private val socketReadListeners = mutableListOf<Pair<MySocket, Int>>()
     private val socketCloseListeners = mutableListOf<Pair<MySocket, Int>>()
@@ -59,8 +58,6 @@ class ActivityHome : AppCompatActivity() {
         //  *****   HOST
         if(Session.state == SessionState.HOST) {
             val data = HostData.get!!
-            val configMe = ConfigData(data.hostName, true)
-            configClients = Array(data.clients.size) { i -> ConfigData(data.clients[i].name) }
 
             //  update
             addSocketListener(data.mySockets) { jo, tag ->
@@ -115,19 +112,20 @@ class ActivityHome : AppCompatActivity() {
             updateViewGlobal(data)
     
             viewConfigMe = ViewDevice(this, vConfig)
-            viewConfigMe.initView(configMe, "[host]")
+            viewConfigMe.initView(Session.config, "[host]")
             viewConfigMe.vSettings.setOnClickListener {
-                configMe.dialog(this).setOnCancelListener {
-                    viewConfigMe.updateView(configMe, "[host]")
+                Session.config.dialog(this) {
+                    Session.config = it
                 }
             }
     
-            viewConfigClients = Array(configClients.size) { ViewDevice(this, vConfig) }
-            for (i in configClients.indices) {
-                viewConfigClients[i].initView(configClients[i], "")
+            val configCopy = data.getClientConfigs()
+            viewConfigClients = Array(configCopy.size) { ViewDevice(this, vConfig) }
+            for (i in configCopy.indices) {
+                viewConfigClients[i].initView(configCopy[i], "")
                 viewConfigClients[i].vSettings.setOnClickListener {
-                    configClients[i].dialog(this).setOnCancelListener {
-                        configClients[i].send(data.mySockets[i]) { log(it) }
+                    data.getClientConfigs()[i].dialog(this) {
+                        data.setClientConfig(i, it, this::log)
                     }
                 }
             }
@@ -138,9 +136,9 @@ class ActivityHome : AppCompatActivity() {
                 //  client dialogs
                 var dialogClient: (Int) -> Unit = {}
                 dialogClient = { i ->
-                    if (i < configClients.size) {
-                        configClients[i].dialog(this).setOnCancelListener {
-                            configClients[i].send(data.mySockets[i]) { log(it) }
+                    if (i < configCopy.size) {
+                        configCopy[i].dialog(this) {
+                            data.setClientConfig(i, it, this::log)
                             dialogClient(i+1)
                         }
                     }
@@ -150,10 +148,9 @@ class ActivityHome : AppCompatActivity() {
                 //  create dialogs
                 data.createDialog(this).setOnCancelListener {
                     updateViewGlobal(data)
-
-                    Session.config = configMe
-                    configMe.dialog(this).setOnCancelListener {
-                        viewConfigMe.updateView(configMe, "[host]")
+    
+                    Session.config.dialog(this) {
+                        Session.config = it
 
                         dialogClient(0)
                     }
@@ -205,37 +202,56 @@ class ActivityHome : AppCompatActivity() {
 
                 //  feedback
                 val all = Session.getStarts().filter { !hasLaunched.contains(it.id) }
-                var feedback = "${Globals.FORMAT_TIME.format(MyTimer.getTime())}"
-                if(all.isEmpty()) feedback += "\nno start scheduled"
-                else {
-                    if(all.size == 1) "\nwill start at ${Globals.FORMAT_TIME.format(all.minOf { it.timeOfInit })}"
-                    else "\nwill start at ${Globals.FORMAT_TIME.format(all.minOf { it.timeOfInit })} (+${all.size} others)"
+                var feedback = Globals.FORMAT_TIME.format(MyTimer.getTime())
+                feedback += when {
+                    all.isEmpty() -> "\nno start scheduled"
+                    all.size == 1 -> "\nwill start at ${Globals.FORMAT_TIME.format(all.minOf { it.timeOfInit })}"
+                    else          -> "\nwill start at ${Globals.FORMAT_TIME.format(all.minOf { it.timeOfInit })} (+${all.size-1} others)"
                 }
-                if(GpsTime.numObservations < MIN_OBSERVATIONS) feedback += "\nDEVICE HAS NO GPS CONNECTION"
-                else if(Session.state == SessionState.HOST && HostData.get!!.isHasGpsTime.any{ !it }) feedback += "\nCLIENT HAS NO GPS CONNECTION"
                 
+                //  ui
                 runOnUiThread {
                     synchronized(feedbacks) {
-                        vFeedback.setString("$feedback\n\n\n${feedbacks.reversed().joinToString("\n")}")
+                        vFeedback.setString("$feedback\n\n\n\n${feedbacks.reversed().joinToString("\n")}")
                     }
                     
                     //  host configs
-                    synchronized(configClients) {
-                        if (Session.state == SessionState.HOST) {
-                            for (i in configClients.indices)
-                                updateClient(i, HostData.get!!)
+                    if (Session.state == SessionState.HOST) {
+                        val data = HostData.get!!
+    
+                        //  host
+                        when {
+                            !MyTimer.isHasGpsTime() ->
+                                viewConfigMe.updateView(Session.config, "", "[NOGPS]")
+                            else ->
+                                viewConfigMe.updateView(Session.config, "[host]")
                         }
+                        
+                        //  clients
+                        val configCopy = data.getClientConfigs()
+                        for (i in configCopy.indices)
+                            when {
+                                !data.isHasGpsTime[i] ->
+                                    viewConfigClients[i].updateView(configCopy[i], "", "[NOGPS]")
+                                MyTimer.getTime() - data.lastUpdate[i] > TIME_CONNECTION_TIMEOUT ->
+                                    viewConfigClients[i].updateView(configCopy[i], "", "[DISCONNECTED]")
+                                else ->
+                                    viewConfigClients[i].updateView(configCopy[i], "[connected]")
+                            }
                     }
                     
                     //  client config
                     if(Session.state == SessionState.CLIENT)
-                        viewConfigMe.updateView(Session.config,
-                            when {
-                                !ClientData.get!!.isHasHostGps || !MyTimer.isHasGpsTime() -> "[NOGPS]"
-                                MyTimer.getTime() - ClientData.get!!.lastUpdate < TIME_CONNECTION_TIMEOUT -> "[connected]"
-                                else -> "[DISCONNECTED]"
-                            }
-                        )
+                        when {
+                            !MyTimer.isHasGpsTime() ->
+                                viewConfigMe.updateView(Session.config, "", "[NOGPS]")
+                            !ClientData.get!!.isHasHostGps ->
+                                viewConfigMe.updateView(Session.config, "", "[HOST-NOGPS]")
+                            MyTimer.getTime() - ClientData.get!!.lastUpdate > TIME_CONNECTION_TIMEOUT ->
+                                viewConfigMe.updateView(Session.config, "", "[DISCONNECTED]")
+                            else ->
+                                viewConfigMe.updateView(Session.config, "[connected]")
+                        }
                 }
             }
         }
@@ -254,15 +270,6 @@ class ActivityHome : AppCompatActivity() {
     private fun updateViewGlobal(data: HostData) {
         viewGlobal.vTitle.text = data.command
         viewGlobal.vDesc.setString("flavor:${data.flavor/1000}s length:${data.videoLength/1000}s Δ:+${data.delta/1000}s")
-    }
-    
-    private fun updateClient(i:Int, data: HostData) {
-        viewConfigClients[i].updateView(configClients[i], when {
-                !data.isHasGpsTime[i] || !MyTimer.isHasGpsTime()                 -> "[NOGPS]"
-                MyTimer.getTime() - data.lastUpdate[i] < TIME_CONNECTION_TIMEOUT -> "[connected]"
-                else -> "[DISCONNECTED]"
-            }
-        )
     }
 
     private fun addSocketListener(sockets: Array<MySocket>, action:(jo:JSONObject, tag:String) -> Unit) {
@@ -300,6 +307,6 @@ class ActivityHome : AppCompatActivity() {
 
     companion object {
         const val TIME_START = 3_000L
-        const val TIME_CONNECTION_TIMEOUT = 5_000L
+        const val TIME_CONNECTION_TIMEOUT = 3_000L
     }
 }

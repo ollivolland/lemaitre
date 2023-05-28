@@ -22,10 +22,11 @@ class ConfigData(val deviceName:String, private val isHost:Boolean = false) {
     	if (isHost) isCommand = true
     }
 
-    fun dialog(context: Context):Dialog {
+    fun dialog(context: Context, onCancel:(ConfigData)->Unit) {
+        val copy = copy()
+        
         val d = Dialog(context)
         d.setContentView(R.layout.dialog_config)
-
         val vTitle = d.findViewById<TextView>(R.id.config_tTitle)
         val vSwitchCommand = d.findViewById<SwitchMaterial>(R.id.client_sCommand)
         val vSwitchCamera = d.findViewById<SwitchMaterial>(R.id.client_sCamera)
@@ -35,23 +36,26 @@ class ConfigData(val deviceName:String, private val isHost:Boolean = false) {
         vTitle.text = deviceName
 
         vSpinnerFps.config(FPS_DESCRIPTIONS, FPS_CHOICES.indexOf(fps)) { i -> fps = FPS_CHOICES[i] }
-        vSpinnerFps.visibility = if(isCamera) View.VISIBLE else View.GONE
+        vSpinnerFps.visibility = if(copy.isCamera) View.VISIBLE else View.GONE
         
-        vSwitchCommand.isChecked = isCommand
+        vSwitchCommand.isChecked = copy.isCommand
         if(isHost) vSwitchCommand.isEnabled = false
-        vSwitchCommand.setOnCheckedChangeListener { _, isChecked -> isCommand = isChecked }
-    
-        vSwitchCamera.isChecked = isCamera
-        vSwitchCamera.setOnCheckedChangeListener { _, isChecked ->
-            isCamera = isChecked
-            
-            vSpinnerFps.visibility = if(isCamera) View.VISIBLE else View.GONE
+        vSwitchCommand.setOnCheckedChangeListener { _, isChecked ->
+            copy.isCommand = isChecked
         }
     
-        vSwitchGate.isChecked = isGate
+        vSwitchCamera.isChecked = copy.isCamera
+        vSwitchCamera.setOnCheckedChangeListener { _, isChecked ->
+            copy.isCamera = isChecked
+            
+            vSpinnerFps.visibility = if(copy.isCamera) View.VISIBLE else View.GONE
+        }
+    
+        vSwitchGate.isChecked = copy.isGate
         vSwitchGate.setOnCheckedChangeListener { _, isChecked ->
-            isGate = isChecked
-            if(isGate) {
+            copy.isGate = isChecked
+            
+            if(copy.isGate) {
                 vSpinnerFps.setSelection(0)    //  set to 30 fps
                 vSpinnerFps.isEnabled = false
             }
@@ -59,7 +63,7 @@ class ConfigData(val deviceName:String, private val isHost:Boolean = false) {
         }
 
         d.show()
-        return d
+        d.setOnCancelListener { onCancel(copy) }
     }
 
     fun copy(): ConfigData {

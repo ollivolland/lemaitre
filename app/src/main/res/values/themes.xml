@@ -18,8 +18,6 @@
         <item name="android:windowLightStatusBar">true</item>
         
         <!-- Customize your theme here. -->
-        <item name="buttonStyle">@style/Theme.Lemaitre2.Button</item>
-        <item name="imageButtonStyle">@style/Theme.Lemaitre2.ImageButton</item>
         <item name="switchStyle">@style/Theme.Lemaitre2.Switch</item>
     </style>
 

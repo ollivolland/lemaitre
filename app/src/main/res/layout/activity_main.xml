@@ -16,16 +16,16 @@
         android:gravity="center_horizontal|top"
         >
 
-        <Button
-            android:id="@+id/buttonHost"
+        <Button android:id="@+id/buttonHost"
+            style="@style/Theme.Lemaitre2.Button"
             android:layout_width="100dp"
             android:layout_height="100dp"
             android:text="Host"
             android:textSize="10sp"
             />
     
-        <Button
-            android:id="@+id/buttonClient"
+        <Button android:id="@+id/buttonClient"
+            style="@style/Theme.Lemaitre2.Button"
             android:layout_width="100dp"
             android:layout_height="100dp"
             android:layout_marginStart="50dp"

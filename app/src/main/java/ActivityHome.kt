@@ -2,10 +2,10 @@ package com.ollivolland.lemaitre2
 
 import Globals
 import MyTimer
-import MyTimer.Companion.MIN_OBSERVATIONS
 import ViewDevice
 import android.annotation.SuppressLint
-import android.app.AlertDialog
+import android.app.DatePickerDialog
+import android.app.TimePickerDialog
 import android.os.Bundle
 import android.view.View
 import android.view.WindowManager
@@ -13,9 +13,9 @@ import android.widget.ImageButton
 import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.TimePicker
+import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import datas.ClientData
-import datas.ConfigData
 import datas.HostData
 import datas.StartData
 import org.json.JSONObject
@@ -75,25 +75,23 @@ class ActivityHome : AppCompatActivity() {
             val vSchedule = findViewById<ImageButton>(R.id.home_bSchedule)
     
             vSchedule.setOnClickListener {
-                val viewDialog = layoutInflater.inflate(R.layout.view_schedule, null)
-                val vTimePicker = viewDialog.findViewById<TimePicker>(R.id.schedule_vTimePicker)
-        
-                vTimePicker.setIs24HourView(true)
-                AlertDialog.Builder(this)
-                    .setView(viewDialog)
-                    .setPositiveButton("ok") { a, _ ->
+                val c = Calendar.getInstance()
+                
+                TimePickerDialog(this,
+                    { _, hour, minute ->
                         val calendar = Calendar.getInstance()
-                        calendar.time = Date()
-                        calendar[Calendar.HOUR_OF_DAY] = vTimePicker.hour
-                        calendar[Calendar.MINUTE] = vTimePicker.minute
+                        calendar[Calendar.HOUR_OF_DAY] = hour
+                        calendar[Calendar.MINUTE] = minute
                         calendar[Calendar.SECOND] = 0
-    
-                        val start = StartData.create(calendar.timeInMillis, data.command, data.flavor, data.videoLength)
-                        Session.addStart(start)
-                        start.send(data.mySockets, this::log)
                         
-                        a.dismiss()
-                    }
+                        if(calendar.timeInMillis < System.currentTimeMillis())
+                            Toast.makeText(this, "Time already passed", Toast.LENGTH_LONG).show()
+                        else {
+                            val start = StartData.create(calendar.timeInMillis, data.command, data.flavor, data.videoLength)
+                            Session.addStart(start)
+                            start.send(data.mySockets, this::log)
+                        }
+                    }, c.get(Calendar.HOUR_OF_DAY), c.get(Calendar.MINUTE) + 1, true)
                     .show()
             }
 
@@ -101,12 +99,6 @@ class ActivityHome : AppCompatActivity() {
                 val start = StartData.create(MyTimer.getTime() + data.delta, data.command, data.flavor, data.videoLength)
                 Session.addStart(start)
                 start.send(data.mySockets, this::log)
-                
-//                vStart.isEnabled = false
-//                thread {
-//                    Thread.sleep(500)
-//                    runOnUiThread { vStart.isEnabled = true }
-//                }
             }
     
             viewGlobal = ViewDevice(this, vConfig)

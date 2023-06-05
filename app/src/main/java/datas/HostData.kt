@@ -103,7 +103,7 @@ class HostData private constructor(val hostName:String, val clients: Array<Clien
         const val COMMAND_LANG = "kLang"
         const val COMMAND_BIEP = "biep"
         val COMMAND_CHOICES = arrayOf(COMMAND_KURZ, COMMAND_MITTEL, COMMAND_LANG, COMMAND_BIEP)
-        val COMMAND_DESCRIPTIONS = arrayOf("Wettkampf 1-2s", "Wettkampf 2-3s", "Wettkampf 3-4s", "Biep")
+        val COMMAND_DESCRIPTIONS = arrayOf("Wettkampf 1-2s", "Kommando 1.5-3s", "Kommando 2-4s", "Biep")
         val FLAVOR_CHOICES = arrayOf(10_000L, 20_000L, 30_000L)
         val FLAVOR_DESCRIPTIONS = arrayOf("flavor 10s", "flavor 20s", "flavor 30s")
         val DURATION_CHOICES = arrayOf(10_000L, 30_000L, 60_000L)

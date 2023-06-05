@@ -52,8 +52,8 @@
             android:visibility="gone"
             >
 
-            <ImageButton
-                android:id="@+id/home_bStart"
+            <ImageButton android:id="@+id/home_bStart"
+                style="@style/Theme.Lemaitre2.ImageButton"
                 android:layout_width="100dp"
                 android:layout_height="100dp"
                 android:padding="27dp"
@@ -61,8 +61,8 @@
                 android:scaleType="fitCenter"
                 />
 
-            <ImageButton
-                android:id="@+id/home_bSchedule"
+            <ImageButton android:id="@+id/home_bSchedule"
+                style="@style/Theme.Lemaitre2.ImageButton"
                 android:layout_width="100dp"
                 android:layout_height="100dp"
                 android:layout_marginStart="50dp"

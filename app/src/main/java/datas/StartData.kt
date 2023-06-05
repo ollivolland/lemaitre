@@ -31,7 +31,7 @@ data class StartData(val id:Long, val timeOfInit:Long, val timeToCommand: Long, 
     }
 
     companion object {
-        private const val DURATION_FERTIG_MS:Long = 700
+        private const val DURATION_FERTIG_MS:Long = 150     //  duration of "f"
         private const val DURATION_TO_SHOT_MS:Long = 20
         const val JSON_TAG = "start"
 
@@ -42,17 +42,17 @@ data class StartData(val id:Long, val timeOfInit:Long, val timeToCommand: Long, 
                 HostData.COMMAND_KURZ -> {
                     builder[R.raw.aufdieplaetze_5db] = 0
                     builder[R.raw.fertig_5db, flavor] = DURATION_FERTIG_MS
-                    builder[R.raw.gunshot_10db, Globals.RANDOM.nextLong(700, 2000)] = DURATION_TO_SHOT_MS
+                    builder[R.raw.gunshot_10db, Globals.RANDOM.nextLong(1000, 2000)] = DURATION_TO_SHOT_MS
                 }
                 HostData.COMMAND_MITTEL -> {
                     builder[R.raw.aufdieplaetze_5db] = 0
                     builder[R.raw.fertig_5db, flavor] = DURATION_FERTIG_MS
-                    builder[R.raw.gunshot_10db, Globals.RANDOM.nextLong(2000, 3000)] = DURATION_TO_SHOT_MS
+                    builder[R.raw.gunshot_10db, Globals.RANDOM.nextLong(1500, 3000)] = DURATION_TO_SHOT_MS
                 }
                 HostData.COMMAND_LANG -> {
                     builder[R.raw.aufdieplaetze_5db] = 0
                     builder[R.raw.fertig_5db, flavor] = DURATION_FERTIG_MS
-                    builder[R.raw.gunshot_10db, Globals.RANDOM.nextLong(3000, 4000)] = DURATION_TO_SHOT_MS
+                    builder[R.raw.gunshot_10db, Globals.RANDOM.nextLong(2000, 4000)] = DURATION_TO_SHOT_MS
                 }
                 HostData.COMMAND_BIEP -> {
                     builder[R.raw.aufdieplaetze_5db] = 0

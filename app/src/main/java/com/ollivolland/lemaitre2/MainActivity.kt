@@ -34,12 +34,13 @@ class MainActivity : AppCompatActivity() {
     
     //  todo    video timestamp
     //  todo    display images
-    //  todo    stop start
+    //  todo    stop start on all devices
     //  todo    persistent socket
     //  todo    restart session
     //  todo    dialog spinner info
 
     //  BUGS
+    //  todo    bug change config not done
     
     private val wifiManager: WifiManager by lazy { applicationContext.getSystemService(Context.WIFI_SERVICE) as WifiManager }
     private val locationManager: LocationManager by lazy { getSystemService(Context.LOCATION_SERVICE) as LocationManager }
@@ -90,7 +91,7 @@ class MainActivity : AppCompatActivity() {
             }
 
             thread {
-                Thread.sleep(200)
+                while (!myWifiP2p.isGroupFormed) Thread.sleep(10)
                 runOnUiThread { vHost.isEnabled = true }
             }
         }

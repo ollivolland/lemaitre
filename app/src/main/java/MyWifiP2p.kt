@@ -32,6 +32,7 @@ class MyWifiP2p(private val activity: MainActivity) {
 	private lateinit var hostMac:String
 	private lateinit var mySocketFormation: MySocket
 	var deviceName: String = ""
+	var isGroupFormed:Boolean = false;private set
 	
 	var isWantUpdateFormationDevices = true
 	private var isHasTriedConnectingToHost = false
@@ -81,7 +82,10 @@ class MyWifiP2p(private val activity: MainActivity) {
 			
 			println("connection: formed = ${info.groupFormed}, isOwner = ${info.isGroupOwner}")
 			
-			if(!isConnected && info.groupFormed) log("CONNECTED (${info.groupOwnerAddress.hostAddress})")
+			if(!isConnected && info.groupFormed) {
+				log("CONNECTED (${info.groupOwnerAddress.hostAddress})")
+				isGroupFormed = true
+			}
 			if(isConnected && !info.groupFormed) log("DISCONNECTED")
 			
 			

@@ -27,6 +27,7 @@ import kotlin.concurrent.thread
 class ActivityHome : AppCompatActivity() {
     private lateinit var vLogger: TextView
     private lateinit var vFeedback: TextView
+    private lateinit var vImportant: TextView
     private val logs:MutableList<String> = mutableListOf()
     private val feedbacks:MutableList<String> = mutableListOf()
     private val wakeLock = MyWakeLock()
@@ -47,6 +48,7 @@ class ActivityHome : AppCompatActivity() {
 
         vLogger = findViewById(R.id.home_tLogger)
         vFeedback = findViewById(R.id.home_tFeedback)
+        vImportant = findViewById(R.id.home_tImportant)
         val vBlinker = findViewById<View>(R.id.home_vBlinker)
         val vConfig = findViewById<LinearLayout>(R.id.home_lConfig)
         val vButtons = findViewById<LinearLayout>(R.id.home_lButtons)
@@ -61,7 +63,7 @@ class ActivityHome : AppCompatActivity() {
 
             //  update
             addSocketListener(data.mySockets) { jo, tag ->
-                Session.tryReceiveFeedback(jo, tag) { msg -> showFeedback(msg) }
+                Session.tryReceiveFeedback(jo, tag, this::showFeedback)
             }
             addSocketCloseListener(data.mySockets)
 
@@ -86,7 +88,7 @@ class ActivityHome : AppCompatActivity() {
     
                         val start = StartData.create(calendar.timeInMillis, data.command, data.flavor, data.videoLength)
                         Session.addStart(start)
-                        start.send(data.mySockets) { log(it) }
+                        start.send(data.mySockets, this::log)
                         
                         a.dismiss()
                     }
@@ -96,13 +98,13 @@ class ActivityHome : AppCompatActivity() {
             vStart.setOnClickListener {
                 val start = StartData.create(MyTimer.getTime() + data.delta, data.command, data.flavor, data.videoLength)
                 Session.addStart(start)
-                start.send(data.mySockets) { log(it) }
+                start.send(data.mySockets, this::log)
                 
-                vStart.isEnabled = false
-                thread {
-                    Thread.sleep(500)
-                    runOnUiThread { vStart.isEnabled = true }
-                }
+//                vStart.isEnabled = false
+//                thread {
+//                    Thread.sleep(500)
+//                    runOnUiThread { vStart.isEnabled = true }
+//                }
             }
     
             viewGlobal = ViewDevice(this, vConfig)
@@ -202,17 +204,17 @@ class ActivityHome : AppCompatActivity() {
 
                 //  feedback
                 val all = Session.getStarts().filter { !hasLaunched.contains(it.id) }
-                var feedback = Globals.FORMAT_TIME.format(MyTimer.getTime())
-                feedback += when {
-                    all.isEmpty() -> "\nno start scheduled"
-                    all.size == 1 -> "\nwill start at ${Globals.FORMAT_TIME.format(all.minOf { it.timeOfInit })}"
-                    else          -> "\nwill start at ${Globals.FORMAT_TIME.format(all.minOf { it.timeOfInit })} (+${all.size-1} others)"
-                }
                 
                 //  ui
                 runOnUiThread {
+                    vImportant.setString(
+                    "${Globals.FORMAT_TIME.format(MyTimer.getTime())}\n\n"+ when {
+                        all.isEmpty() -> "no start scheduled"
+                        all.size < 5  -> "will start at\n${all.sortedBy { it.timeOfInit }.joinToString("\n") { Globals.FORMAT_TIME.format(it.timeOfInit) }}"
+                        else          -> "will start at\n${all.sortedBy { it.timeOfInit }.take(4).joinToString("\n") { Globals.FORMAT_TIME.format(it.timeOfInit) }}\n + ${all.size-4} others"
+                    })
                     synchronized(feedbacks) {
-                        vFeedback.setString("$feedback\n\n\n\n${feedbacks.reversed().joinToString("\n")}")
+                        vFeedback.setString(feedbacks.reversed().joinToString("\n"))
                     }
                     
                     //  host configs

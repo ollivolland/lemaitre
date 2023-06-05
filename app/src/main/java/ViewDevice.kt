@@ -33,8 +33,9 @@ class ViewDevice(activity: Activity, viewGroup: ViewGroup) {
 		if(configData.isCommand) has.add("command")
 		if(configData.isCamera) has.add("camera")
 		if(configData.isGate) has.add("gate")
+		val status = if(has.isEmpty()) "useless" else has.joinToString("&")
 		
 		vError.text = error
-		vDesc.text = "$desc   ${has.joinToString("&")}"
+		vDesc.text = "$desc   $status"
 	}
 }

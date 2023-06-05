@@ -42,6 +42,10 @@ class ActivityStart : AppCompatActivity() {
         val vStop = findViewById<ImageButton>(R.id.start_bStop)
 
         vLog.text = "$start\n${start.config}"
+        
+        vStop.setOnClickListener {
+            finish()
+        }
 
         //  camera
         if(start.config.isCamera || start.config.isGate) {
@@ -161,8 +165,14 @@ class ActivityStart : AppCompatActivity() {
         super.onDestroy()
         isBusy = false
         if(this::myCamera2.isInitialized) myCamera2.close()
-        if(this::gateMp.isInitialized) gateMp.release()
-        mps.forEach { it.release() }
+        if(this::gateMp.isInitialized) {
+            gateMp.pause()
+            gateMp.release()
+        }
+        mps.forEach {
+            it.pause()
+            it.release()
+        }
     }
 
     companion object {

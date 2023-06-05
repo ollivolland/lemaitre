@@ -6,21 +6,20 @@
     android:layout_height="wrap_content"
     android:orientation="vertical"
     android:gravity="start"
+    android:padding="10dp"
     >
 
     <TextView
         android:id="@+id/config_tTitle"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:paddingStart="20dp"
-        android:paddingTop="10dp"
         android:layout_marginBottom="20dp"
         android:textStyle="bold"
         android:textSize="20sp"
         android:textColor="#000"
         />
     
-    <com.google.android.material.switchmaterial.SwitchMaterial
+    <androidx.appcompat.widget.SwitchCompat
         android:id="@+id/client_sCommand"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
@@ -29,10 +28,11 @@
         android:layoutDirection="rtl"
         />
 
-    <com.google.android.material.switchmaterial.SwitchMaterial
+    <androidx.appcompat.widget.SwitchCompat
         android:id="@+id/client_sCamera"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
+        android:layout_marginTop="10dp"
         android:text="camera"
         app:switchPadding="20dp"
         android:layoutDirection="rtl"
@@ -44,11 +44,12 @@
         android:layout_height="wrap_content"
         android:visibility="gone"
         />
-
-    <com.google.android.material.switchmaterial.SwitchMaterial
+    
+    <androidx.appcompat.widget.SwitchCompat
         android:id="@+id/client_sGate"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
+        android:layout_marginTop="10dp"
         android:text="gate"
         app:switchPadding="20dp"
         android:layoutDirection="rtl"

@@ -8,6 +8,7 @@ import android.annotation.SuppressLint
 import android.app.AlertDialog
 import android.os.Bundle
 import android.view.View
+import android.view.WindowManager
 import android.widget.ImageButton
 import android.widget.LinearLayout
 import android.widget.TextView
@@ -44,6 +45,7 @@ class ActivityHome : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_home)
+        window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         println("HOME CREATED")
 
         vLogger = findViewById(R.id.home_tLogger)
@@ -55,7 +57,7 @@ class ActivityHome : AppCompatActivity() {
     
         //  misc
         GpsTime.register(this)
-        wakeLock.acquire(this)
+//        wakeLock.acquire(this)
 
         //  *****   HOST
         if(Session.state == SessionState.HOST) {

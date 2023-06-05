@@ -22,9 +22,8 @@
             android:layout_height="100dp"
             android:text="Host"
             android:textSize="10sp"
-            android:background="@drawable/selector_button"
             />
-
+    
         <Button
             android:id="@+id/buttonClient"
             android:layout_width="100dp"
@@ -32,7 +31,6 @@
             android:layout_marginStart="50dp"
             android:textSize="10sp"
             android:text="Client"
-            android:background="@drawable/selector_button"
             />
 
     </LinearLayout>

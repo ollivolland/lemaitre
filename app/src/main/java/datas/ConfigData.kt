@@ -4,7 +4,9 @@ import android.app.Dialog
 import android.content.Context
 import android.view.View
 import android.widget.Spinner
+import android.widget.Switch
 import android.widget.TextView
+import androidx.appcompat.widget.SwitchCompat
 import com.google.android.material.switchmaterial.SwitchMaterial
 import com.ollivolland.lemaitre2.MySocket
 import com.ollivolland.lemaitre2.R
@@ -28,9 +30,9 @@ class ConfigData(val deviceName:String, private val isHost:Boolean = false) {
         val d = Dialog(context)
         d.setContentView(R.layout.dialog_config)
         val vTitle = d.findViewById<TextView>(R.id.config_tTitle)
-        val vSwitchCommand = d.findViewById<SwitchMaterial>(R.id.client_sCommand)
-        val vSwitchCamera = d.findViewById<SwitchMaterial>(R.id.client_sCamera)
-        val vSwitchGate = d.findViewById<SwitchMaterial>(R.id.client_sGate)
+        val vSwitchCommand = d.findViewById<SwitchCompat>(R.id.client_sCommand)
+        val vSwitchCamera = d.findViewById<SwitchCompat>(R.id.client_sCamera)
+        val vSwitchGate = d.findViewById<SwitchCompat>(R.id.client_sGate)
         val vSpinnerFps = d.findViewById<Spinner>(R.id.client_sFps)
 
         vTitle.text = deviceName

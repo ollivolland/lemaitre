@@ -4,6 +4,12 @@
     <color name="primary_dark">#593D1D</color>
     <color name="primary_light">#FFBC85</color>
     
+    <color name="primary_complement">#11688C</color>
+    <color name="primary_complement_light">#9DCAFF</color>
+    <color name="on_primary">#ffffff</color>
+    
+    <color name="text">#808080</color>
+    
     <color name="purple_200">#FFBB86FC</color>
 <!--    <color name="primary">#22AB74</color>-->
 <!--    <color name="primary">#A8763E</color>-->

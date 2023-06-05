@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8"?>
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+	<!-- priority top to bottom -->
+	
+	<!-- pressed -->
+	<item android:state_pressed="true">
+		<layer-list>
+			<item>
+				<shape android:shape="rectangle">
+					<solid android:color="@color/primary_complement" />
+					<corners android:radius="8dp" />
+				</shape>
+			</item>
+			<item>
+				<ripple android:color="@color/primary_light"/>
+			</item>
+		</layer-list>
+	</item>
+	
+	<!-- disabled -->
+	<item android:state_enabled="false">
+		<shape android:shape="rectangle">
+			<solid android:color="#ccc" />
+			<corners android:radius="8dp" />
+		</shape>
+	</item>
+	
+	<!-- default -->
+	<item>
+		<shape android:shape="rectangle">
+			<solid android:color="@color/primary" />
+			<corners android:radius="8dp" />
+		</shape>
+	</item>
+</selector>

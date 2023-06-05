@@ -1,12 +1,12 @@
 <resources>
     <!-- Base application theme. -->
-    <style name="Theme.Lemaitre2" parent="Theme.MaterialComponents.DayNight.NoActionBar">
+    <style name="Theme.Lemaitre2" parent="Theme.AppCompat.DayNight.NoActionBar">
         <item name="colorSurface">#fff</item>
         
         <!-- Primary brand color. -->
         <item name="colorPrimary">@color/primary</item>
         <item name="colorPrimaryVariant">@color/purple_700</item>
-        <item name="colorOnPrimary">@color/white</item>
+        <item name="colorOnPrimary">@color/on_primary</item>
         
         <!-- Secondary brand color. -->
         <item name="colorSecondary">@color/teal_200</item>
@@ -18,8 +18,9 @@
         <item name="android:windowLightStatusBar">true</item>
         
         <!-- Customize your theme here. -->
-<!--        <item name="buttonStyle">@style/Lemaitre2.Button</item>-->
-<!--        <item name="imageButtonStyle">@style/Lemaitre2.ImageButton</item>-->
+        <item name="buttonStyle">@style/Theme.Lemaitre2.Button</item>
+        <item name="imageButtonStyle">@style/Theme.Lemaitre2.ImageButton</item>
+        <item name="switchStyle">@style/Theme.Lemaitre2.Switch</item>
     </style>
 
     <style name="Theme.Lemaitre2.Translucent" parent="Theme.Lemaitre2">
@@ -27,11 +28,21 @@
         <item name="android:windowTranslucentNavigation">true</item>
     </style>
     
-<!--    <style name="Lemaitre2.Button" parent="Widget.Material3.Button">-->
-<!--        <item name="background">@drawable/selector_button</item>-->
-<!--    </style>-->
+    <!-- STYLES -->
     
-<!--    <style name="Lemaitre2.ImageButton" parent="Widget.Material3.MaterialTimePicker.ImageButton">-->
-<!--        <item name="background">@drawable/selector_button</item>-->
-<!--    </style>-->
+    <style name="Theme.Lemaitre2.Button" parent="Widget.AppCompat.Button">
+        <item name="android:background">@drawable/button_selector</item>
+        <item name="android:textColor">?colorOnPrimary</item>
+    </style>
+    
+    <style name="Theme.Lemaitre2.ImageButton" parent="Widget.AppCompat.ImageButton">
+        <item name="android:background">@drawable/button_selector</item>
+        <item name="android:textColor">?colorOnPrimary</item>
+    </style>
+    
+    <style name="Theme.Lemaitre2.Switch" parent="Widget.AppCompat.CompoundButton.Switch">
+        <item name="thumbTint">@color/switch_thumb_selector</item>
+        <item name="trackTint">@color/switch_track_selector</item>
+        <item name="android:textColor">@color/text</item>
+    </style>
 </resources>

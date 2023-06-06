@@ -1,15 +1,14 @@
 package datas
 
 import Client
+import MyClientThread
+import MySocket
 import MyTimer
 import android.app.Dialog
 import android.content.Context
 import android.widget.Spinner
 import android.widget.TextView
-import com.ollivolland.lemaitre2.MyClientThread
-import com.ollivolland.lemaitre2.MySocket
-import com.ollivolland.lemaitre2.R
-import com.ollivolland.lemaitre2.Session
+import com.ollivolland.lemaitre.R
 import config
 import org.json.JSONObject
 import setString

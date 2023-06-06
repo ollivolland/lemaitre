@@ -1,9 +1,8 @@
 package datas
 
 import Globals
-import com.ollivolland.lemaitre2.MySocket
-import com.ollivolland.lemaitre2.R
-import com.ollivolland.lemaitre2.Session
+import MySocket
+import com.ollivolland.lemaitre.R
 import org.json.JSONObject
 
 data class StartData(val id:Long, val timeOfInit:Long, val timeToCommand: Long, val videoLength: Long, val mpStartsBuild:String, val mpIdsBuild:String) {

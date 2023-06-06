@@ -1,5 +1,4 @@
 import android.os.SystemClock
-import com.ollivolland.lemaitre2.GpsTime
 import java.lang.Long.max
 
 class MyTimer {

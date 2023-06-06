@@ -12,7 +12,7 @@ import java.io.File
 import java.text.SimpleDateFormat
 import java.util.*
 
-class MyRecorder(private val myCamera2: MyCamera2, private val recordingProfileBuilder: RecordingProfileBuilder) {
+class MyRecorder internal constructor(private val myCamera2: MyCamera2, private val recordingProfileBuilder: RecordingProfileBuilder) {
 	private val codec: MediaCodec
 	private var isWrite = false
 	private var isWantStart = false

@@ -1,12 +1,11 @@
 package datas
 
+import MyServerThread
+import MySocket
 import MyTimer
 import android.content.Intent
-import com.ollivolland.lemaitre2.ActivityHome
-import com.ollivolland.lemaitre2.MainActivity
-import com.ollivolland.lemaitre2.MyServerThread
-import com.ollivolland.lemaitre2.MySocket
-import com.ollivolland.lemaitre2.Session
+import com.ollivolland.lemaitre.ActivityHome
+import com.ollivolland.lemaitre.MainActivity
 import org.json.JSONObject
 import kotlin.concurrent.thread
 

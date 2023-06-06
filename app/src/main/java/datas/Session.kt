@@ -1,7 +1,6 @@
-package com.ollivolland.lemaitre2
+package datas
 
-import datas.ConfigData
-import datas.StartData
+import MySocket
 import org.json.JSONObject
 
 class Session {

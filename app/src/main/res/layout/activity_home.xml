@@ -57,7 +57,7 @@
                 android:layout_width="100dp"
                 android:layout_height="100dp"
                 android:padding="27dp"
-                android:src="@drawable/sharp_play_arrow_white_24"
+                android:src="@drawable/outline_play_48"
                 android:scaleType="fitCenter"
                 />
 
@@ -67,7 +67,7 @@
                 android:layout_height="100dp"
                 android:layout_marginStart="50dp"
                 android:padding="27dp"
-                android:src="@drawable/sharp_alarm_white_24"
+                android:src="@drawable/outline_watch_48"
                 android:scaleType="fitCenter"
                 />
 

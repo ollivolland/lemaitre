@@ -1,5 +1,3 @@
-package com.ollivolland.lemaitre2
-
 import android.annotation.SuppressLint
 import android.content.Context
 import android.location.Location

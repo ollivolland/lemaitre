@@ -1,10 +1,10 @@
+package com.ollivolland.lemaitre
+
 import android.app.Activity
 import android.view.View
 import android.view.ViewGroup
-import android.widget.Button
 import android.widget.ImageButton
 import android.widget.TextView
-import com.ollivolland.lemaitre2.R
 import datas.ConfigData
 
 class ViewDevice(activity: Activity, viewGroup: ViewGroup) {

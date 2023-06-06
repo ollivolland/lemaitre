@@ -1,10 +1,10 @@
-package com.ollivolland.lemaitre2
+package com.ollivolland.lemaitre
 
 import Globals
+import GpsTime
+import MySocket
 import MyTimer
-import ViewDevice
 import android.annotation.SuppressLint
-import android.app.DatePickerDialog
 import android.app.TimePickerDialog
 import android.os.Bundle
 import android.view.View
@@ -12,15 +12,15 @@ import android.view.WindowManager
 import android.widget.ImageButton
 import android.widget.LinearLayout
 import android.widget.TextView
-import android.widget.TimePicker
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import datas.ClientData
 import datas.HostData
+import datas.Session
+import datas.SessionState
 import datas.StartData
 import org.json.JSONObject
 import setString
-import wakelock.MyWakeLock
 import java.util.*
 import kotlin.concurrent.thread
 
@@ -31,7 +31,6 @@ class ActivityHome : AppCompatActivity() {
     private lateinit var vImportant: TextView
     private val logs:MutableList<String> = mutableListOf()
     private val feedbacks:MutableList<String> = mutableListOf()
-    private val wakeLock = MyWakeLock()
     private lateinit var viewGlobal:ViewDevice
     private lateinit var viewConfigMe:ViewDevice
     private lateinit var viewConfigClients:Array<ViewDevice>
@@ -257,7 +256,6 @@ class ActivityHome : AppCompatActivity() {
         super.onDestroy()
         isRunning = false
         GpsTime.unregister()
-        wakeLock.release()
         
         for(x in socketReadListeners) x.first.removeOnJson(x.second)
         for(x in socketCloseListeners) x.first.removeOnClose(x.second)

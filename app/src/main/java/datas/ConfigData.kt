@@ -1,16 +1,13 @@
 package datas
 
+import MySocket
 import android.app.Dialog
 import android.content.Context
 import android.view.View
 import android.widget.Spinner
-import android.widget.Switch
 import android.widget.TextView
 import androidx.appcompat.widget.SwitchCompat
-import com.google.android.material.switchmaterial.SwitchMaterial
-import com.ollivolland.lemaitre2.MySocket
-import com.ollivolland.lemaitre2.R
-import com.ollivolland.lemaitre2.Session
+import com.ollivolland.lemaitre.R
 import config
 import org.json.JSONObject
 

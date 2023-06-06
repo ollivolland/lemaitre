@@ -1,8 +1,10 @@
-package com.ollivolland.lemaitre2
+package com.ollivolland.lemaitre
 
 import MyWifiP2p
 import android.Manifest
-import android.content.*
+import android.content.Context
+import android.content.Intent
+import android.content.IntentSender
 import android.content.pm.PackageManager
 import android.location.LocationManager
 import android.net.wifi.WifiManager
@@ -21,6 +23,8 @@ import com.google.android.gms.location.LocationSettingsRequest
 import com.google.android.gms.location.SettingsClient
 import datas.ClientData
 import datas.HostData
+import datas.Session
+import datas.SessionState
 import setString
 import kotlin.concurrent.thread
 
@@ -75,7 +79,7 @@ class MainActivity : AppCompatActivity() {
         myWifiP2p = MyWifiP2p(this)
 
         vHost.setOnClickListener {
-            Session.state= SessionState.HOST
+            Session.state = SessionState.HOST
             myWifiP2p.startRegistration()
 
             vHost.setString("launch!")

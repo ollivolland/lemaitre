@@ -1,12 +1,14 @@
 package mycamera2
 
 import android.Manifest
-import android.annotation.SuppressLint
 import android.app.Activity
 import android.content.Context
 import android.content.pm.PackageManager
-import android.hardware.camera2.*
-import android.media.Image
+import android.hardware.camera2.CameraCaptureSession
+import android.hardware.camera2.CameraCharacteristics
+import android.hardware.camera2.CameraDevice
+import android.hardware.camera2.CameraManager
+import android.hardware.camera2.CaptureRequest
 import android.media.ImageReader
 import android.os.Handler
 import android.os.HandlerThread
@@ -69,7 +71,7 @@ class MyCamera2(val context: Activity) {
 			}, backgroundHandler)   //  open in backgroundThread
 	}
 	
-	fun addSurface():ValueObservable<Surface> {
+	internal fun addSurface():ValueObservable<Surface> {
 		val observable = ValueObservable<Surface>({ tryCreateSession() })
 		surfaces.add(observable)
 		

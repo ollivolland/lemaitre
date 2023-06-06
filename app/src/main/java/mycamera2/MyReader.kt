@@ -1,10 +1,9 @@
 package mycamera2
 
 import android.graphics.ImageFormat
-import android.media.Image
 import android.media.ImageReader
 
-class MyReader(private val myCamera2: MyCamera2, readerProfileBuilder: ReaderProfileBuilder, listener:ImageReader.OnImageAvailableListener) {
+class MyReader internal constructor(private val myCamera2: MyCamera2, readerProfileBuilder: ReaderProfileBuilder, listener:ImageReader.OnImageAvailableListener) {
 	
 	init {
 		val surfaceObservable = myCamera2.addSurface()

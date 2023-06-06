@@ -10,12 +10,10 @@ import android.view.Surface
 import android.view.TextureView
 import kotlin.math.abs
 
-class MyPreview(private val myCamera2: MyCamera2, private val vTextureView: TextureView) {
-	
+class MyPreview internal constructor(private val myCamera2: MyCamera2, private val vTextureView: TextureView) {
 	private val surfaceObservable:ValueObservable<Surface> = myCamera2.addSurface()
 	
 	init {
-		//  process textureView
 		if (vTextureView.isAvailable)
 			processTextureView(vTextureView)
 		else

@@ -9,13 +9,10 @@ import android.net.wifi.p2p.WifiP2pDevice
 import android.net.wifi.p2p.WifiP2pManager
 import android.net.wifi.p2p.nsd.WifiP2pDnsSdServiceInfo
 import android.net.wifi.p2p.nsd.WifiP2pDnsSdServiceRequest
-import com.ollivolland.lemaitre2.MainActivity
-import com.ollivolland.lemaitre2.MyClientThread
-import com.ollivolland.lemaitre2.MyServerThread
-import com.ollivolland.lemaitre2.MySocket
-import com.ollivolland.lemaitre2.Session
-import com.ollivolland.lemaitre2.SessionState
+import com.ollivolland.lemaitre.MainActivity
 import datas.ClientData
+import datas.Session
+import datas.SessionState
 import org.json.JSONObject
 import kotlin.concurrent.thread
 
@@ -45,7 +42,7 @@ class MyWifiP2p(private val activity: MainActivity) {
 		disconnectAll()
 		
 		checkNeedAnotherSocket = {
-			if (Session.state ==  SessionState.HOST && isFormationSocketReady && clients.count() < formationDevices.count()) {
+			if (Session.state == SessionState.HOST && isFormationSocketReady && clients.count() < formationDevices.count()) {
 				isFormationSocketReady = false
 				val port = MainActivity.PORT_COMMUNICATION + clients.count()
 				var ip = ""

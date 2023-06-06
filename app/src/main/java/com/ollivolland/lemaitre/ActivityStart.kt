@@ -1,4 +1,4 @@
-package com.ollivolland.lemaitre2
+package com.ollivolland.lemaitre
 
 import Analyzer
 import MyTimer
@@ -7,9 +7,12 @@ import android.media.MediaPlayer
 import android.os.Bundle
 import android.view.TextureView
 import android.view.View
+import android.view.WindowManager
 import android.widget.ImageButton
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
+import datas.Session
+import datas.SessionState
 import datas.StartData
 import mycamera2.MyCamera2
 import mycamera2.MyRecorder
@@ -31,6 +34,7 @@ class ActivityStart : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_start)
+        window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
 
         timer = MyTimer()
         start = startData!!

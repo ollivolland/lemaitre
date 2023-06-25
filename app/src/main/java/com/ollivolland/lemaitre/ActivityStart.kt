@@ -60,8 +60,21 @@ class ActivityStart : AppCompatActivity() {
         //  video
         if(start.config.isCamera) {
             myRecorder = myCamera2.addRecorder(MyRecorder.RecordingProfileBuilder().apply {
-                fps = start.config.fps
                 bytesPerSecond = 5_000_000
+                fps = start.config.fps
+                
+                when (start.config.quality) {
+                    1 -> {
+                        width = 2560
+                        height = 1440
+                        bytesPerSecond = 10_000_000
+                    }
+                    2 -> {
+                        width = 3840
+                        height = 2160
+                        bytesPerSecond = 10_000_000
+                    }
+                }
             })
             isCameraStarted = false
             isCameraStopped = false

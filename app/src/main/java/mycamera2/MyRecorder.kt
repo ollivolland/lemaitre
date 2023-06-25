@@ -106,7 +106,7 @@ class MyRecorder internal constructor(private val myCamera2: MyCamera2, private 
 			val deviceRotation = MyPreview.SURFACE_ROTATION_TO_DEGREES[myCamera2.context.windowManager.defaultDisplay.rotation]!!
 			val cameraSensorRotation = characteristics[CameraCharacteristics.SENSOR_ORIENTATION]!!
 			val totalRotation = (cameraSensorRotation-deviceRotation+360)%360
-			muxer.setOrientationHint(totalRotation) //  totalRotation is 90° wrong
+			muxer.setOrientationHint(totalRotation) //  todo    totalRotation is 90° wrong
 		}
 	}
 	

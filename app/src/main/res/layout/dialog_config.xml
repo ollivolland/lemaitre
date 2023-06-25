@@ -45,6 +45,13 @@
         android:visibility="gone"
         />
     
+    <Spinner
+        android:id="@+id/client_sQuality"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:visibility="gone"
+        />
+    
     <androidx.appcompat.widget.SwitchCompat
         android:id="@+id/client_sGate"
         android:layout_width="wrap_content"

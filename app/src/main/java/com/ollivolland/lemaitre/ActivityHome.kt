@@ -1,11 +1,11 @@
 package com.ollivolland.lemaitre
 
 import Globals
-import GpsTime
 import MySocket
 import MyTimer
 import android.annotation.SuppressLint
 import android.app.TimePickerDialog
+import android.content.Intent
 import android.os.Bundle
 import android.view.View
 import android.view.WindowManager
@@ -29,6 +29,7 @@ class ActivityHome : AppCompatActivity() {
     private lateinit var vLogger: TextView
     private lateinit var vFeedback: TextView
     private lateinit var vImportant: TextView
+    private lateinit var vPreview: ImageButton
     private val logs:MutableList<String> = mutableListOf()
     private val feedbacks:MutableList<String> = mutableListOf()
     private lateinit var viewGlobal:ViewDevice
@@ -50,13 +51,10 @@ class ActivityHome : AppCompatActivity() {
         vLogger = findViewById(R.id.home_tLogger)
         vFeedback = findViewById(R.id.home_tFeedback)
         vImportant = findViewById(R.id.home_tImportant)
+        vPreview = findViewById(R.id.home_bPreview)
         val vBlinker = findViewById<View>(R.id.home_vBlinker)
         val vConfig = findViewById<LinearLayout>(R.id.home_lConfig)
         val vButtons = findViewById<LinearLayout>(R.id.home_lButtons)
-    
-        //  misc
-        GpsTime.register(this)
-//        wakeLock.acquire(this)
 
         //  *****   HOST
         if(Session.state == SessionState.HOST) {
@@ -98,6 +96,10 @@ class ActivityHome : AppCompatActivity() {
                 val start = StartData.create(MyTimer.getTime() + data.delta, data.command, data.flavor, data.videoLength)
                 Session.addStart(start)
                 start.send(data.mySockets, this::log)
+            }
+    
+            vPreview.setOnClickListener {
+                startActivity(Intent(this, ActivityPreview::class.java))
             }
     
             viewGlobal = ViewDevice(this, vConfig)
@@ -213,15 +215,6 @@ class ActivityHome : AppCompatActivity() {
                     //  host configs
                     if (Session.state == SessionState.HOST) {
                         val data = HostData.get!!
-    
-                        //  host
-                        when {
-                            !MyTimer.isHasGpsTime() ->
-                                viewConfigMe.updateView(Session.config, "", "[NOGPS]")
-                            else ->
-                                viewConfigMe.updateView(Session.config, "[host]")
-                        }
-                        
                         //  clients
                         val configCopy = data.getClientConfigs()
                         for (i in configCopy.indices)
@@ -235,18 +228,7 @@ class ActivityHome : AppCompatActivity() {
                             }
                     }
                     
-                    //  client config
-                    if(Session.state == SessionState.CLIENT)
-                        when {
-                            !MyTimer.isHasGpsTime() ->
-                                viewConfigMe.updateView(Session.config, "", "[NOGPS]")
-                            !ClientData.get!!.isHasHostGps ->
-                                viewConfigMe.updateView(Session.config, "", "[HOST-NOGPS]")
-                            MyTimer.getTime() - ClientData.get!!.lastUpdate > TIME_CONNECTION_TIMEOUT ->
-                                viewConfigMe.updateView(Session.config, "", "[DISCONNECTED]")
-                            else ->
-                                viewConfigMe.updateView(Session.config, "[connected]")
-                        }
+                    updateOwnConfig()
                 }
             }
         }
@@ -255,7 +237,6 @@ class ActivityHome : AppCompatActivity() {
     override fun onDestroy() {
         super.onDestroy()
         isRunning = false
-        GpsTime.unregister()
         
         for(x in socketReadListeners) x.first.removeOnJson(x.second)
         for(x in socketCloseListeners) x.first.removeOnClose(x.second)
@@ -264,6 +245,30 @@ class ActivityHome : AppCompatActivity() {
     private fun updateViewGlobal(data: HostData) {
         viewGlobal.vTitle.text = data.command
         viewGlobal.vDesc.setString("flavor:${data.flavor/1000}s length:${data.videoLength/1000}s Δ:+${data.delta/1000}s")
+    }
+    
+    private fun updateOwnConfig() {
+        //  host config
+        if (Session.state == SessionState.HOST)
+            when {
+                !MyTimer.isHasGpsTime() -> viewConfigMe.updateView(Session.config, "", "[NOGPS]")
+                else -> viewConfigMe.updateView(Session.config, "[host]")
+            }
+        
+        //  client config
+        if(Session.state == SessionState.CLIENT)
+            when {
+                !MyTimer.isHasGpsTime() ->
+                    viewConfigMe.updateView(Session.config, "", "[NOGPS]")
+                !ClientData.get!!.isHasHostGps ->
+                    viewConfigMe.updateView(Session.config, "", "[HOST-NOGPS]")
+                MyTimer.getTime() - ClientData.get!!.lastUpdate > TIME_CONNECTION_TIMEOUT ->
+                    viewConfigMe.updateView(Session.config, "", "[DISCONNECTED]")
+                else ->
+                    viewConfigMe.updateView(Session.config, "[connected]")
+            }
+        
+        vPreview.visibility = if(Session.config.isCamera || Session.config.isGate) View.VISIBLE else View.GONE
     }
 
     private fun addSocketListener(sockets: Array<MySocket>, action:(jo:JSONObject, tag:String) -> Unit) {

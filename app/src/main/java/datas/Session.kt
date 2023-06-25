@@ -1,6 +1,8 @@
 package datas
 
+import GpsTime
 import MySocket
+import com.ollivolland.lemaitre.MyApp
 import org.json.JSONObject
 
 class Session {
@@ -16,6 +18,11 @@ class Session {
         var config:ConfigData
             set(value) { synchronized(mConfig) { mConfig = value } }
             get() { synchronized(mConfig) { return mConfig.copy() } }
+        
+        init {
+            //  misc
+            GpsTime.register(MyApp.appContext)
+        }
         
         fun sendFeedback(mySocket: MySocket, string:String) {
             mySocket.write(JSONObject().apply {

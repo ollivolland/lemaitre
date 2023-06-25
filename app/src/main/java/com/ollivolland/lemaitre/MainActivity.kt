@@ -31,20 +31,24 @@ import kotlin.concurrent.thread
 
 class MainActivity : AppCompatActivity() {
     //  by urgency
-    //  todo    thread safety
-    //  todo    audioTrack instead of MediaPlayer   https://stackoverflow.com/questions/12263671/audiotrack-android-playing-sounds-from-raw-folder
+    //  todo    check if cam profile is available
     //  todo    host send delay&gate, display only once both received
-    //  todo    microphone
-    
     //  todo    video timestamp
     //  todo    display images
     //  todo    stop start on all devices
-    //  todo    persistent socket
-    //  todo    restart session
     //  todo    dialog spinner info
+    //  todo    separate home warnings and errors
+    //  todo    home disable buttons on error
+    //  todo    set volume to 10
+    //  todo    camera & gate orientation
+    //  todo    display storage space
+    
+    //  big
+    //  todo    persistent socket
+    //  todo    microphone
+    //  todo    audioTrack instead of MediaPlayer   https://stackoverflow.com/questions/12263671/audiotrack-android-playing-sounds-from-raw-folder
 
     //  BUGS
-    //  todo    bug change config not done
     
     private val wifiManager: WifiManager by lazy { applicationContext.getSystemService(Context.WIFI_SERVICE) as WifiManager }
     private val locationManager: LocationManager by lazy { getSystemService(Context.LOCATION_SERVICE) as LocationManager }

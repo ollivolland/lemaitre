@@ -13,6 +13,7 @@ import org.json.JSONObject
 
 class ConfigData(val deviceName:String, private val isHost:Boolean = false) {
     var fps = FPS_CHOICES[0];private set
+    var quality = QUALITY_CHOICES[0];private set
     var isGate = false;private set
     var isCamera = false;private set
     var isCommand = false;private set
@@ -31,11 +32,15 @@ class ConfigData(val deviceName:String, private val isHost:Boolean = false) {
         val vSwitchCamera = d.findViewById<SwitchCompat>(R.id.client_sCamera)
         val vSwitchGate = d.findViewById<SwitchCompat>(R.id.client_sGate)
         val vSpinnerFps = d.findViewById<Spinner>(R.id.client_sFps)
+        val vSpinnerQuality = d.findViewById<Spinner>(R.id.client_sQuality)
 
         vTitle.text = deviceName
 
-        vSpinnerFps.config(FPS_DESCRIPTIONS, FPS_CHOICES.indexOf(fps)) { i -> fps = FPS_CHOICES[i] }
+        vSpinnerFps.config(FPS_DESCRIPTIONS, FPS_CHOICES.indexOf(fps)) { i -> copy.fps = FPS_CHOICES[i] }
         vSpinnerFps.visibility = if(copy.isCamera) View.VISIBLE else View.GONE
+    
+        vSpinnerQuality.config(QUALITY_DESCRIPTIONS, quality) { i -> copy.quality = i }
+        vSpinnerQuality.visibility = if(copy.isCamera) View.VISIBLE else View.GONE
         
         vSwitchCommand.isChecked = copy.isCommand
         if(isHost) vSwitchCommand.isEnabled = false
@@ -48,6 +53,7 @@ class ConfigData(val deviceName:String, private val isHost:Boolean = false) {
             copy.isCamera = isChecked
             
             vSpinnerFps.visibility = if(copy.isCamera) View.VISIBLE else View.GONE
+            vSpinnerQuality.visibility = if(copy.isCamera) View.VISIBLE else View.GONE
         }
     
         vSwitchGate.isChecked = copy.isGate
@@ -68,6 +74,7 @@ class ConfigData(val deviceName:String, private val isHost:Boolean = false) {
     fun copy(): ConfigData {
         return ConfigData(deviceName).also { copy ->
             copy.fps = fps
+            copy.quality = quality
             copy.isCommand = isCommand
             copy.isCamera = isCamera
             copy.isGate = isGate
@@ -80,18 +87,21 @@ class ConfigData(val deviceName:String, private val isHost:Boolean = false) {
             accumulate("isCamera", isCamera)
             accumulate("isGate", isGate)
             accumulate("fps", fps)
+            accumulate("quality", quality)
         }, JSON_TAG)
         
         action?.invoke("sent config $this")
     }
 
     override fun toString(): String {
-        return "isCamera = $isCamera, isCommand = $isCommand, isGate = $isGate, fps = $fps"
+        return "isCamera = $isCamera, isCommand = $isCommand, isGate = $isGate, fps = $fps, quality = $quality"
     }
 
     companion object {
         val FPS_CHOICES = arrayOf(30, 60, 100)
+        val QUALITY_CHOICES = arrayOf(0, 1, 2)
         val FPS_DESCRIPTIONS = arrayOf("30 fps", "60 fps", "100 fps")
+        val QUALITY_DESCRIPTIONS = arrayOf("1080p", "1440p", "2160p")
         const val JSON_TAG = "config"
 
         fun tryReceive(jo:JSONObject, tag:String, deviceName: String) {
@@ -102,6 +112,7 @@ class ConfigData(val deviceName:String, private val isHost:Boolean = false) {
                 isCamera = jo["isCamera"] as Boolean
                 isGate = jo["isGate"] as Boolean
                 fps = jo["fps"] as Int
+                quality = jo["quality"] as Int
             }
         }
     }

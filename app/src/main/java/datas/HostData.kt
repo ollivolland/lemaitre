@@ -105,8 +105,8 @@ class HostData private constructor(val hostName:String, val clients: Array<Clien
         val COMMAND_DESCRIPTIONS = arrayOf("Wettkampf 1-2s", "Kommando 1.5-3s", "Kommando 2-4s", "Biep")
         val FLAVOR_CHOICES = arrayOf(10_000L, 20_000L, 30_000L)
         val FLAVOR_DESCRIPTIONS = arrayOf("flavor 10s", "flavor 20s", "flavor 30s")
-        val DURATION_CHOICES = arrayOf(10_000L, 30_000L, 60_000L)
-        val DURATION_DESCRIPTIONS = arrayOf("duration 10s", "duration 30s", "duration 60s")
+        val DURATION_CHOICES = arrayOf(10_000L, 20_000L, 30_000L, 60_000L, 0L)
+        val DURATION_DESCRIPTIONS = arrayOf("duration 10s", "duration 20s", "duration 30s", "duration 60s", "null")
         val DELTA_CHOICES = arrayOf(3_000L, 10_000L, 60_000L)
         val DELTA_DESCRIPTIONS = arrayOf("Δ3s", "Δ10s", "Δ60s")
 

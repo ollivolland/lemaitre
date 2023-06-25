@@ -4,6 +4,7 @@ import android.Manifest
 import android.app.Activity
 import android.content.Context
 import android.content.pm.PackageManager
+import android.graphics.ImageFormat
 import android.hardware.camera2.CameraCaptureSession
 import android.hardware.camera2.CameraCharacteristics
 import android.hardware.camera2.CameraDevice
@@ -14,10 +15,12 @@ import android.os.Handler
 import android.os.HandlerThread
 import android.util.Log
 import android.util.Range
+import android.util.Size
 import android.view.Surface
 import android.view.TextureView
 import androidx.core.app.ActivityCompat
 import kotlin.math.max
+
 
 /**
  *   (1)    get CameraDevice
@@ -39,11 +42,25 @@ class MyCamera2(val context: Activity) {
 	private var isWantSessionOpen = false
 	private var isSessionOpen = false
 	private var fps = 30
+	val sizes:Array<Size>
 	
 	init {
 		//  get camera id
 		val cameraId = cameraManager.cameraIdList
 			.filter { cameraManager.getCameraCharacteristics(it)[CameraCharacteristics.LENS_FACING] == CameraCharacteristics.LENS_FACING_BACK }[0]
+		
+		//  capabilities
+		val characteristics = cameraManager.getCameraCharacteristics(cameraId)
+		val capabilities = characteristics.get(CameraCharacteristics.REQUEST_AVAILABLE_CAPABILITIES)
+		val streamConfigurationMap = characteristics.get(CameraCharacteristics.SCALER_STREAM_CONFIGURATION_MAP)
+		
+//		val cams = characteristics.physicalCameraIds
+//		val maxZoom = characteristics[CameraCharacteristics.SCALER_AVAILABLE_MAX_DIGITAL_ZOOM]
+		sizes = streamConfigurationMap?.getOutputSizes(ImageFormat.JPEG) ?: emptyArray()
+//		val ss = characteristics[CameraCharacteristics.SENSOR_INFO_PHYSICAL_SIZE]!!
+//		val foc = characteristics[CameraCharacteristics.LENS_INFO_AVAILABLE_FOCAL_LENGTHS]!![0]
+//		val angleW = 2 * atan(ss.width * .5 * foc)
+//		val angleH = 2 * atan(ss.height * .5 * foc)
 		
 		//  (1) open cameraDevice
 		if (ActivityCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED)

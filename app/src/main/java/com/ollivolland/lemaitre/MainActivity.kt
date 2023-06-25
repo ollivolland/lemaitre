@@ -81,6 +81,10 @@ class MainActivity : AppCompatActivity() {
         
         //  wifi
         myWifiP2p = MyWifiP2p(this)
+        myWifiP2p.disconnectAll {
+            vClient.isEnabled = true
+            vHost.isEnabled = true
+        }
 
         vHost.setOnClickListener {
             Session.state = SessionState.HOST

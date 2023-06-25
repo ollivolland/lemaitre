@@ -55,6 +55,10 @@ class ActivityHome : AppCompatActivity() {
         val vBlinker = findViewById<View>(R.id.home_vBlinker)
         val vConfig = findViewById<LinearLayout>(R.id.home_lConfig)
         val vButtons = findViewById<LinearLayout>(R.id.home_lButtons)
+    
+        vPreview.setOnClickListener {
+            startActivity(Intent(this, ActivityPreview::class.java))
+        }
 
         //  *****   HOST
         if(Session.state == SessionState.HOST) {
@@ -96,10 +100,6 @@ class ActivityHome : AppCompatActivity() {
                 val start = StartData.create(MyTimer.getTime() + data.delta, data.command, data.flavor, data.videoLength)
                 Session.addStart(start)
                 start.send(data.mySockets, this::log)
-            }
-    
-            vPreview.setOnClickListener {
-                startActivity(Intent(this, ActivityPreview::class.java))
             }
     
             viewGlobal = ViewDevice(this, vConfig)

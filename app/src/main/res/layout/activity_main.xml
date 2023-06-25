@@ -22,6 +22,7 @@
             android:layout_height="100dp"
             android:text="Host"
             android:textSize="10sp"
+            android:enabled="false"
             />
     
         <Button android:id="@+id/buttonClient"
@@ -31,6 +32,7 @@
             android:layout_marginStart="50dp"
             android:textSize="10sp"
             android:text="Client"
+            android:enabled="false"
             />
 
     </LinearLayout>

@@ -39,8 +39,6 @@ class MyWifiP2p(private val activity: MainActivity) {
 	private var isFormationSocketReady = true
 	
 	init {
-		disconnectAll()
-		
 		checkNeedAnotherSocket = {
 			if (Session.state == SessionState.HOST && isFormationSocketReady && clients.count() < formationDevices.count()) {
 				isFormationSocketReady = false
@@ -166,7 +164,7 @@ class MyWifiP2p(private val activity: MainActivity) {
 		})
 	}
 	
-	private fun disconnectAll() {
+	fun disconnectAll(onDisconnected:()->Unit) {
 		manager.stopPeerDiscovery(channel, MyWifiP2pActionListener("stopPeerDiscovery").setOnComplete {
 			manager.clearServiceRequests(channel, MyWifiP2pActionListener("clearServiceRequests").setOnComplete {
 				manager.clearLocalServices(channel, MyWifiP2pActionListener("clearLocalServices").setOnComplete {
@@ -174,6 +172,7 @@ class MyWifiP2p(private val activity: MainActivity) {
 						manager.removeGroup(channel, MyWifiP2pActionListener("removeGroup").setOnComplete {
 							isWantConnection = true
 							log("all connections reset")
+							onDisconnected()
 						})
 					})
 				})

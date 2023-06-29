@@ -3,6 +3,7 @@ package com.ollivolland.lemaitre
 import Globals
 import MySocket
 import MyTimer
+import MyWifiP2p
 import android.annotation.SuppressLint
 import android.app.TimePickerDialog
 import android.content.Intent
@@ -17,7 +18,6 @@ import androidx.appcompat.app.AppCompatActivity
 import datas.ClientData
 import datas.HostData
 import datas.Session
-import datas.SessionState
 import datas.StartData
 import org.json.JSONObject
 import setString
@@ -30,14 +30,12 @@ class ActivityHome : AppCompatActivity() {
     private lateinit var vFeedback: TextView
     private lateinit var vImportant: TextView
     private lateinit var vPreview: ImageButton
-    private val logs:MutableList<String> = mutableListOf()
     private val feedbacks:MutableList<String> = mutableListOf()
     private lateinit var viewGlobal:ViewDevice
     private lateinit var viewConfigMe:ViewDevice
     private lateinit var viewConfigClients:Array<ViewDevice>
     private val hasLaunched = mutableListOf<Long>()
     private val socketReadListeners = mutableListOf<Pair<MySocket, Int>>()
-    private val socketCloseListeners = mutableListOf<Pair<MySocket, Int>>()
     private var isRunning = true
     private var isDialogsFinished = false
 
@@ -61,14 +59,13 @@ class ActivityHome : AppCompatActivity() {
         }
 
         //  *****   HOST
-        if(Session.state == SessionState.HOST) {
+        if(Session.isHost) {
             val data = HostData.get!!
 
             //  update
             addSocketListener(data.mySockets) { jo, tag ->
                 Session.tryReceiveFeedback(jo, tag, this::showFeedback)
             }
-            addSocketCloseListener(data.mySockets)
 
             //  ui
             vButtons.visibility = View.VISIBLE
@@ -90,7 +87,7 @@ class ActivityHome : AppCompatActivity() {
                         else {
                             val start = StartData.create(calendar.timeInMillis, data.command, data.flavor, data.videoLength)
                             Session.addStart(start)
-                            start.send(data.mySockets, this::log)
+                            start.send(data.mySockets)
                         }
                     }, c.get(Calendar.HOUR_OF_DAY), c.get(Calendar.MINUTE) + 1, true)
                     .show()
@@ -99,7 +96,7 @@ class ActivityHome : AppCompatActivity() {
             vStart.setOnClickListener {
                 val start = StartData.create(MyTimer.getTime() + data.delta, data.command, data.flavor, data.videoLength)
                 Session.addStart(start)
-                start.send(data.mySockets, this::log)
+                start.send(data.mySockets)
             }
     
             viewGlobal = ViewDevice(this, vConfig)
@@ -122,7 +119,7 @@ class ActivityHome : AppCompatActivity() {
                 viewConfigClients[i].initView(configCopy[i], "")
                 viewConfigClients[i].vSettings.setOnClickListener {
                     data.getClientConfigs()[i].dialog(this) {
-                        data.setClientConfig(i, it, this::log)
+                        data.setClientConfig(i, it)
                     }
                 }
             }
@@ -135,7 +132,7 @@ class ActivityHome : AppCompatActivity() {
                 dialogClient = { i ->
                     if (i < configCopy.size) {
                         configCopy[i].dialog(this) {
-                            data.setClientConfig(i, it, this::log)
+                            data.setClientConfig(i, it)
                             dialogClient(i+1)
                         }
                     }
@@ -159,6 +156,9 @@ class ActivityHome : AppCompatActivity() {
         else {
             val data = ClientData.get!!
     
+            MyWifiP2p.get?.stopDiscovery()
+            MyWifiP2p.get?.stopNSD()
+            
             viewConfigMe = ViewDevice(this, vConfig)
             viewConfigMe.vTitle.text = data.deviceName
             viewConfigMe.vSettings.visibility = View.GONE
@@ -166,7 +166,6 @@ class ActivityHome : AppCompatActivity() {
             addSocketListener(arrayOf(data.mySocket)) { jo, tag ->
                 Session.tryReceiveFeedback(jo, tag) { msg -> showFeedback(msg) }
             }
-            addSocketCloseListener(arrayOf(data.mySocket))
             
             isDialogsFinished = true
         }
@@ -194,7 +193,7 @@ class ActivityHome : AppCompatActivity() {
                         hasLaunched.add(x.id)
                         ActivityStart.launch(this, x)
                         showFeedback("[${Globals.FORMAT_TIME.format(x.timeOfInit)}] started\n")
-                        log("do $x")
+                        Session.log("do start $x")
                     }
 
                 //  feedback
@@ -211,18 +210,19 @@ class ActivityHome : AppCompatActivity() {
                     synchronized(feedbacks) {
                         vFeedback.setString(feedbacks.reversed().joinToString("\n"))
                     }
+                    vLogger.text = Session.getLogs().takeLast(20).reversed().joinToString("\n")
                     
                     //  host configs
-                    if (Session.state == SessionState.HOST) {
+                    if (Session.isHost) {
                         val data = HostData.get!!
                         //  clients
                         val configCopy = data.getClientConfigs()
                         for (i in configCopy.indices)
                             when {
-                                !data.isHasGpsTime[i] ->
-                                    viewConfigClients[i].updateView(configCopy[i], "", "[NOGPS]")
                                 MyTimer.getTime() - data.lastUpdate[i] > TIME_CONNECTION_TIMEOUT ->
                                     viewConfigClients[i].updateView(configCopy[i], "", "[DISCONNECTED]")
+                                !data.isHasGpsTime[i] ->
+                                    viewConfigClients[i].updateView(configCopy[i], "", "[NOGPS]")
                                 else ->
                                     viewConfigClients[i].updateView(configCopy[i], "[connected]")
                             }
@@ -237,9 +237,9 @@ class ActivityHome : AppCompatActivity() {
     override fun onDestroy() {
         super.onDestroy()
         isRunning = false
+        MyWifiP2p.get?.close()
         
         for(x in socketReadListeners) x.first.removeOnJson(x.second)
-        for(x in socketCloseListeners) x.first.removeOnClose(x.second)
     }
     
     private fun updateViewGlobal(data: HostData) {
@@ -249,21 +249,21 @@ class ActivityHome : AppCompatActivity() {
     
     private fun updateOwnConfig() {
         //  host config
-        if (Session.state == SessionState.HOST)
+        if (Session.isHost)
             when {
                 !MyTimer.isHasGpsTime() -> viewConfigMe.updateView(Session.config, "", "[NOGPS]")
                 else -> viewConfigMe.updateView(Session.config, "[host]")
             }
         
         //  client config
-        if(Session.state == SessionState.CLIENT)
+        if(Session.isClient)
             when {
+                MyTimer.getTime() - ClientData.get!!.lastUpdate > TIME_CONNECTION_TIMEOUT ->
+                    viewConfigMe.updateView(Session.config, "", "[DISCONNECTED]")
                 !MyTimer.isHasGpsTime() ->
                     viewConfigMe.updateView(Session.config, "", "[NOGPS]")
                 !ClientData.get!!.isHasHostGps ->
                     viewConfigMe.updateView(Session.config, "", "[HOST-NOGPS]")
-                MyTimer.getTime() - ClientData.get!!.lastUpdate > TIME_CONNECTION_TIMEOUT ->
-                    viewConfigMe.updateView(Session.config, "", "[DISCONNECTED]")
                 else ->
                     viewConfigMe.updateView(Session.config, "[connected]")
             }
@@ -276,25 +276,12 @@ class ActivityHome : AppCompatActivity() {
             socketReadListeners.add(Pair(x, x.addOnJson(action)))
     }
     
-    private fun addSocketCloseListener(sockets: Array<MySocket>) {
-        for (x in sockets)
-            socketCloseListeners.add(Pair(x, x.addOnClose { log("[${x.port}] SOCKET CLOSED") }))
-    }
-
-    private fun log(string: String) {
-        println(string)
-        logs.add(string)
-        runOnUiThread {
-            vLogger.text = logs.takeLast(20).reversed().joinToString("\n")
-        }
-    }
-    
     fun showFeedback(string: String) {
         synchronized(feedbacks) { feedbacks.add(string) }
     }
     
     fun broadcastFeedback(string: String) {
-        if(Session.state == SessionState.HOST) {
+        if(Session.isHost) {
             HostData.get!!.mySockets.forEach {
                 Session.sendFeedback(it, string)
             }

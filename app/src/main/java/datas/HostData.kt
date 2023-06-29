@@ -15,7 +15,7 @@ import setString
 import kotlin.concurrent.thread
 
 class HostData private constructor(val hostName:String, val clients: Array<Client>) {
-    val mySockets:Array<MySocket> = Array(clients.size) { i -> MyClientThread(clients[i].ipWifiP2p, clients[i].port) }
+    val mySockets:Array<MySocket> = Array(clients.size) { i -> createSocket(i) }
     val lastUpdate:Array<Long> = Array(clients.size) { 0 }
     val isHasGpsTime:Array<Boolean> = Array(clients.size) { false }
     private val configClients:Array<ConfigData>
@@ -31,39 +31,52 @@ class HostData private constructor(val hostName:String, val clients: Array<Clien
         configClients = Array(clients.size) { i -> ConfigData(clients[i].name) }
         
         //  launch home
-        for (x in mySockets) x.write(JSONObject(), JSON_TAG_LAUNCH)
-        
-        //  reads
-        for (i in mySockets.indices)
-            mySockets[i].addOnJson { jo, tag ->
-                println("socket[$i] received $tag")
-                
-                //  update
-                if (tag == JSON_TAG_UPDATE) {
-                    synchronized(lastUpdate) { lastUpdate[i] = jo["time"].toString().toLong() }
-                    synchronized(isHasGpsTime) { isHasGpsTime[i] = jo["isHasGps"].toString().toBoolean() }
-                }
-            }
+        for (x in mySockets)
+            x.write(JSONObject(), JSON_TAG_LAUNCH)
+    }
     
+    fun replaceSocket(i:Int) {
+        mySockets[i].addOnClose {
+            thread {
+                Thread.sleep(2000)
+                mySockets[i] = createSocket(i)
+            }
+        }
+        mySockets[i].close()
+    }
+    
+    private fun createSocket(i:Int): MySocket {
+        val socket = MyClientThread(clients[i].ipWifiP2p, clients[i].port)
+        socket.log(Session.Companion::log)
+        socket.addOnJson { jo, tag ->
+            println("socket[$i] received $tag")
+        
+            //  update
+            if (tag == JSON_TAG_UPDATE) {
+                synchronized(lastUpdate) { lastUpdate[i] = MyTimer.getTime() }
+//                synchronized(lastUpdate) { lastUpdate[i] = jo["time"].toString().toLong() }
+                synchronized(isHasGpsTime) { isHasGpsTime[i] = jo["isHasGps"].toString().toBoolean() }
+            }
+        }
     
         //  host update clients
         thread(name = "socketHostDataSendUpdate") {
-            while (mySockets.any { it.isOpen }) {
-                for (x in mySockets.filter { it.isOpen })
-                    x.write(JSONObject().apply {
-                        accumulate("time", MyTimer.getTime())
-                        accumulate("isHasGps", MyTimer.isHasGpsTime())
-                    }, JSON_TAG_UPDATE)
+            while (socket.isWantOpen) {
+                socket.write(JSONObject().apply {
+                    accumulate("time", MyTimer.getTime())
+                    accumulate("isHasGps", MyTimer.isHasGpsTime())
+                }, JSON_TAG_UPDATE)
             
                 Thread.sleep(1000)
             }
         }
+        return socket
     }
     
-    fun setClientConfig(i:Int, config: ConfigData, onSent:((String)->Unit)? = null) {
+    fun setClientConfig(i:Int, config: ConfigData) {
         synchronized(configClients) {
             configClients[i] = config
-            configClients[i].send(mySockets[i], onSent)
+            configClients[i].send(mySockets[i])
         }
     }
     

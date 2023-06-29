@@ -12,7 +12,6 @@ import android.widget.ImageButton
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
 import datas.Session
-import datas.SessionState
 import datas.StartData
 import mycamera2.MyCamera2
 import mycamera2.MyRecorder
@@ -120,7 +119,7 @@ class ActivityStart : AppCompatActivity() {
         //  mps
         if(start.config.isCommand) {
             mps.addAll(Array(start.mpIds.size) { i -> MediaPlayer.create(this, start.mpIds[i]) })
-            if(Session.state == SessionState.HOST) {
+            if(Session.isHost) {
                 val duration = mps.last().duration
                 val audioShouldStartAtMs = start.mpStarts.last()
                 mps.last().setOnCompletionListener {

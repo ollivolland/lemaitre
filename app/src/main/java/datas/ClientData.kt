@@ -10,49 +10,63 @@ import org.json.JSONObject
 import kotlin.concurrent.thread
 
 class ClientData private constructor(val port: Int, val hostMac:String, val deviceName:String, private var mainActivity: MainActivity?) {
-    val mySocket: MySocket
+    lateinit var mySocket: MySocket
     var lastUpdate = MyTimer.getTime()
     var isHasHostGps = false
 
     init {
-        mySocket = MyServerThread(port)
-        mySocket.log { s -> mainActivity?.log(s) }
-        
+        mySocket = createSocket()
+    }
+    
+    fun replaceSocket() {
+        mySocket.addOnClose {
+            mySocket = createSocket()
+        }
+        mySocket.close()
+    }
+    
+    private fun createSocket(): MyServerThread {
+        val socket = MyServerThread(port)
+        socket.log(Session.Companion::log)
+    
         //  launch host
-        mySocket.addOnJson { jo, tag ->
+        socket.addOnJson { jo, tag ->
             println("socket received $tag")
-            
+        
             //  launch
             if(mainActivity != null && tag == HostData.JSON_TAG_LAUNCH) {
                 mainActivity?.startActivity(Intent(mainActivity, ActivityHome::class.java))
                 mainActivity?.finish()
                 mainActivity = null
             }
-            
+        
             //  config
             ConfigData.tryReceive(jo, tag, deviceName)
-            
+        
             //  start
             StartData.tryReceive(jo, tag)
-            
+        
             //  update
             if (tag == HostData.JSON_TAG_UPDATE) {
-                lastUpdate = jo["time"].toString().toLong()
+                lastUpdate = MyTimer.getTime()
+//                lastUpdate = jo["time"].toString().toLong()
                 isHasHostGps = jo["isHasGps"].toString().toBoolean()
             }
         }
     
         //  client update host
         thread(name = "socketClientDataSendUpdate") {
-            while (mySocket.isOpen) {
+            while (mySocket.isWantOpen) {
                 mySocket.write(JSONObject().apply {
                     accumulate("time", MyTimer.getTime())
                     accumulate("isHasGps", MyTimer.isHasGpsTime())
                 }, HostData.JSON_TAG_UPDATE)
-                
+            
                 Thread.sleep(1000)
             }
         }
+    
+        return socket
     }
 
     companion object {

@@ -8,7 +8,7 @@ import org.json.JSONObject
 data class StartData(val id:Long, val timeOfInit:Long, val timeToCommand: Long, val videoLength: Long, val mpStartsBuild:String, val mpIdsBuild:String) {
     val config: ConfigData = Session.config
 
-    fun send(mySockets: Array<MySocket>, action:((String) -> Unit)? = null) {
+    fun send(mySockets: Array<MySocket>) {
         for (x in mySockets)
             x.write(JSONObject().apply {
                 accumulate("id", id)
@@ -19,14 +19,14 @@ data class StartData(val id:Long, val timeOfInit:Long, val timeToCommand: Long, 
                 accumulate("mps", mpIdsBuild)
             }, JSON_TAG)
         
-        action?.invoke("sent start $this")
+        Session.log("sent start $this")
     }
 
     val mpStarts:Array<Long> get() = mpStartsBuild.split(",").map { it.toLong() }.toTypedArray()
     val mpIds:Array<Int> get() = mpIdsBuild.split(",").map { it.toInt() }.toTypedArray()
 
     override fun toString(): String {
-        return "id=$id, timestamp=$timeOfInit"
+        return "{ id=$id, timestamp=$timeOfInit }"
     }
 
     companion object {
@@ -65,14 +65,16 @@ data class StartData(val id:Long, val timeOfInit:Long, val timeToCommand: Long, 
         fun tryReceive(jo:JSONObject, tag:String) {
             if(tag != JSON_TAG) return
     
-            Session.addStart(StartData(
+            val start = StartData(
                 jo["id"].toString().toLong(),
                 jo["timeStamp"].toString().toLong(),
                 jo["commandLength"].toString().toLong(),
                 jo["videoLength"].toString().toLong(),
                 jo["mpStarts"].toString(),
                 jo["mps"].toString(),
-            ))
+            )
+            Session.addStart(start)
+            Session.log("received start $start")
         }
     }
 }

@@ -81,7 +81,7 @@ class ConfigData(val deviceName:String, private val isHost:Boolean = false) {
         }
     }
 
-    fun send(mySocket: MySocket, action: ((String) -> Unit)? = null) {
+    fun send(mySocket: MySocket) {
         mySocket.write(JSONObject().apply {
             accumulate("isCommand", isCommand)
             accumulate("isCamera", isCamera)
@@ -89,12 +89,11 @@ class ConfigData(val deviceName:String, private val isHost:Boolean = false) {
             accumulate("fps", fps)
             accumulate("quality", quality)
         }, JSON_TAG)
-        
-        action?.invoke("sent config $this")
+        Session.log("sent config $this")
     }
 
     override fun toString(): String {
-        return "isCamera = $isCamera, isCommand = $isCommand, isGate = $isGate, fps = $fps, quality = $quality"
+        return "{ isCamera = $isCamera, isCommand = $isCommand, isGate = $isGate, fps = $fps, quality = $quality }"
     }
 
     companion object {
@@ -114,6 +113,7 @@ class ConfigData(val deviceName:String, private val isHost:Boolean = false) {
                 fps = jo["fps"] as Int
                 quality = jo["quality"] as Int
             }
+            Session.log("received config ${Session.config}")
         }
     }
 }

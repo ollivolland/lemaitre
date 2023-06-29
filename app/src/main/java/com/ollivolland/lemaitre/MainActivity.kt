@@ -24,13 +24,13 @@ import com.google.android.gms.location.SettingsClient
 import datas.ClientData
 import datas.HostData
 import datas.Session
-import datas.SessionState
 import setString
 import kotlin.concurrent.thread
 
 
 class MainActivity : AppCompatActivity() {
     //  by urgency
+    //  todo    retransmit on reconnect
     //  todo    check if cam profile is available
     //  todo    host send delay&gate, display only once both received
     //  todo    video timestamp
@@ -44,7 +44,6 @@ class MainActivity : AppCompatActivity() {
     //  todo    display storage space
     
     //  big
-    //  todo    persistent socket
     //  todo    microphone
     //  todo    audioTrack instead of MediaPlayer   https://stackoverflow.com/questions/12263671/audiotrack-android-playing-sounds-from-raw-folder
 
@@ -54,7 +53,6 @@ class MainActivity : AppCompatActivity() {
     private val locationManager: LocationManager by lazy { getSystemService(Context.LOCATION_SERVICE) as LocationManager }
     private var isRunning = true
     lateinit var myWifiP2p:MyWifiP2p
-    private val logs = mutableListOf<String>()
     
     private lateinit var vLogger:TextView
     private lateinit var vFeedback:TextView
@@ -87,7 +85,7 @@ class MainActivity : AppCompatActivity() {
         }
 
         vHost.setOnClickListener {
-            Session.state = SessionState.HOST
+            Session.setState(Session.State.HOST)
             myWifiP2p.startRegistration()
 
             vHost.setString("launch!")
@@ -95,8 +93,11 @@ class MainActivity : AppCompatActivity() {
             vHost.isEnabled = false
             vHost.setOnClickListener {
                 HostData.set(myWifiP2p.deviceName, myWifiP2p.clients)
-                myWifiP2p.isWantDiscoverPeers = false
-                log("finished with ${myWifiP2p.clients.size} clients")
+                myWifiP2p.isFormed = true
+                myWifiP2p.stopNSD()
+                myWifiP2p.stopDiscovery()
+                
+                Session.log("formed with ${myWifiP2p.clients.size} clients")
 
                 startActivity(Intent(this, ActivityHome::class.java))
                 finish()
@@ -109,7 +110,7 @@ class MainActivity : AppCompatActivity() {
         }
 
         vClient.setOnClickListener {
-            Session.state= SessionState.CLIENT
+            Session.setState(Session.State.CLIENT)
             myWifiP2p.discover()
 
             vHost.visibility = View.INVISIBLE
@@ -118,7 +119,7 @@ class MainActivity : AppCompatActivity() {
         }
 
         //  setup
-        log("sdk ${Build.VERSION.SDK_INT}")
+        Session.log("sdk ${Build.VERSION.SDK_INT}")
 
         //  enable wifi
         if(!wifiManager.isWifiEnabled) {
@@ -136,12 +137,13 @@ class MainActivity : AppCompatActivity() {
         thread {
             while (isRunning) {
                 runOnUiThread {
-                    vFeedback.text = when (Session.state) {
-                        SessionState.HOST -> {
+                    vLogger.text = Session.getLogs().takeLast(20).reversed().joinToString("\n")
+                    vFeedback.text = when {
+                        Session.isHost -> {
                             if(myWifiP2p.clients.size == 0) "no clients"
                             else myWifiP2p.clients.joinToString("\n") { it.name }
                         }
-                        SessionState.CLIENT -> if(ClientData.get == null) "waiting for host" else "CONNECTED"
+                        Session.isClient -> if(ClientData.get == null) "waiting for host" else "CONNECTED"
                         else -> "choose"
                     }
                 }
@@ -155,16 +157,6 @@ class MainActivity : AppCompatActivity() {
         super.onDestroy()
         isRunning = false
         myWifiP2p.stopNSD()
-    }
-
-    override fun onResume() {
-        super.onResume()
-        myWifiP2p.receiver.register()
-    }
-
-    override fun onPause() {
-        super.onPause()
-        myWifiP2p.receiver.unregister()
     }
 
     private fun buildAlertMessageNoGps() {
@@ -185,14 +177,6 @@ class MainActivity : AppCompatActivity() {
                     }
                 } else startActivity(Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS))
             }
-    }
-
-    fun log(string: String) {
-        println(string)
-        logs.add(string)
-        runOnUiThread {
-            vLogger.text = logs.takeLast(20).reversed().joinToString("\n")
-        }
     }
 
     companion object {

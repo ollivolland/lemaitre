@@ -17,7 +17,7 @@ abstract class MySocket(val port: Int, private val type:String) {
     private var isInputOpen = true
     protected lateinit var socket: Socket
     private var isSocketConfigured = false
-    var isOpen = true;protected set
+    var isWantOpen = true;protected set
     
     init {
     	println("[$port] $type creating")
@@ -28,7 +28,7 @@ abstract class MySocket(val port: Int, private val type:String) {
         var length:Int
         
         //  read
-        while(isOpen) {
+        while(isWantOpen) {
             try {
                 length = mInputStream.read(buffer)
                 if(length < 0) continue
@@ -46,7 +46,7 @@ abstract class MySocket(val port: Int, private val type:String) {
                 }
             } catch (e:Exception) {
                 e.printStackTrace()
-                isOpen = false
+                isWantOpen = false
             }
         }
     
@@ -64,7 +64,7 @@ abstract class MySocket(val port: Int, private val type:String) {
         accumulate("tag", tag)
     }.toString().encodeToByteArray())
     private fun write(byteArray: ByteArray) {
-        if(!isOpen) return
+        if(!isWantOpen) return
         if(!this::mOutputStream.isInitialized) {
             myOnSocketListener.add { write(byteArray) } //  broken
             return
@@ -74,7 +74,7 @@ abstract class MySocket(val port: Int, private val type:String) {
             try {
                 mOutputStream.write(byteArray)
             } catch (_:Exception) {
-                isOpen = false
+                isWantOpen = false
             }
         }
     }
@@ -102,7 +102,7 @@ abstract class MySocket(val port: Int, private val type:String) {
 
     fun close() {
         executor.execute { isInputOpen = false }
-        isOpen = false
+        isWantOpen = false
     }
 
     fun addOnConfigured(action:(Socket) -> Unit) {
@@ -132,7 +132,6 @@ class MyClientThread(private val inetAddress: String, port: Int): MySocket(port,
     
             setSocketConfigured()
 
-//          Thread.sleep(100)
             finish()
         }
     }

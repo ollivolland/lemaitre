@@ -13,9 +13,8 @@ android {
         applicationId "com.ollivolland.lemaitre"
         minSdk 26
         targetSdk 33
-        versionCode 6
-
-//        testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
+        versionCode 8
+        versionName "8"
     }
 
     buildTypes {

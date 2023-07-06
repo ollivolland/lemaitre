@@ -5,15 +5,16 @@ import MySocket
 import com.ollivolland.lemaitre.R
 import org.json.JSONObject
 
-data class StartData(val id:Long, val timeOfInit:Long, val timeToCommand: Long, val videoLength: Long, val mpStartsBuild:String, val mpIdsBuild:String) {
+data class StartData(val id:Long, val timeInit:Long, val timeInitToCommand: Long, val videoLength: Long, val mpStartsBuild:String, val mpIdsBuild:String) {
     val config: ConfigData = Session.config
+    val timeOfCommand = timeInit + timeInitToCommand
 
     fun send(mySockets: Array<MySocket>) {
         for (x in mySockets)
             x.write(JSONObject().apply {
                 accumulate("id", id)
-                accumulate("timeStamp", timeOfInit)
-                accumulate("commandLength", timeToCommand)
+                accumulate("timeStamp", timeInit)
+                accumulate("commandLength", timeInitToCommand)
                 accumulate("videoLength", videoLength)
                 accumulate("mpStarts", mpStartsBuild)
                 accumulate("mps", mpIdsBuild)
@@ -26,7 +27,7 @@ data class StartData(val id:Long, val timeOfInit:Long, val timeToCommand: Long, 
     val mpIds:Array<Int> get() = mpIdsBuild.split(",").map { it.toInt() }.toTypedArray()
 
     override fun toString(): String {
-        return "{ id=$id, timestamp=$timeOfInit }"
+        return "{ id=$id, timestamp=$timeInit }"
     }
 
     companion object {

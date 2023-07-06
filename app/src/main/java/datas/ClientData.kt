@@ -19,10 +19,8 @@ class ClientData private constructor(val port: Int, val hostMac:String, val devi
     }
     
     fun replaceSocket() {
-        mySocket.addOnClose {
-            mySocket = createSocket()
-        }
         mySocket.close()
+        mySocket = createSocket()
     }
     
     private fun createSocket(): MyServerThread {

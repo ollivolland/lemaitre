@@ -1,5 +1,6 @@
 package com.ollivolland.lemaitre
 
+import GpsTime
 import MyWifiP2p
 import android.Manifest
 import android.content.Context
@@ -44,7 +45,6 @@ class MainActivity : AppCompatActivity() {
     //  todo    display storage space
     
     //  big
-    //  todo    microphone
     //  todo    audioTrack instead of MediaPlayer   https://stackoverflow.com/questions/12263671/audiotrack-android-playing-sounds-from-raw-folder
 
     //  BUGS
@@ -65,6 +65,7 @@ class MainActivity : AppCompatActivity() {
         val permissions = mutableListOf(
             Manifest.permission.ACCESS_COARSE_LOCATION,
             Manifest.permission.ACCESS_FINE_LOCATION,
+            Manifest.permission.RECORD_AUDIO,
             Manifest.permission.CAMERA)
         if (Build.VERSION.SDK_INT >= 33) permissions.add(Manifest.permission.NEARBY_WIFI_DEVICES)
         val toGrant = permissions.filter { s -> checkSelfPermission(s) != PackageManager.PERMISSION_GRANTED }.toTypedArray()
@@ -132,6 +133,8 @@ class MainActivity : AppCompatActivity() {
         //  enable location
         if(!locationManager.isProviderEnabled(LocationManager.GPS_PROVIDER))
             buildAlertMessageNoGps()
+        else
+            GpsTime.register(MyApp.appContext)
 
         //  UIThread
         thread {
@@ -165,18 +168,26 @@ class MainActivity : AppCompatActivity() {
         val client: SettingsClient = LocationServices.getSettingsClient(this)
 
         client.checkLocationSettings(builder.build())
-            .addOnSuccessListener {
-                Toast.makeText(this, "Gps is enabled", Toast.LENGTH_LONG).show()
-            }
             .addOnFailureListener { exception ->
                 if (exception is ResolvableApiException) {
                     try {
                         exception.startResolutionForResult(this, 1000)
                     } catch (sendEx: IntentSender.SendIntentException) {
-                        startActivity(Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS))
+                        startActivityForResult(Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS), 1001)
                     }
-                } else startActivity(Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS))
+                } else
+                    startActivityForResult(Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS), 1001)
             }
+    }
+    
+    @Deprecated("Deprecated in Java")
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        
+        if(requestCode == 1000 || requestCode == 1001) {
+            println("GPS activity result")
+            GpsTime.register(MyApp.appContext)
+        }
     }
 
     companion object {

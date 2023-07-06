@@ -20,3 +20,5 @@ fun Spinner.config(headers: Array<String>, selectionIndex:Int, onSelect: (Int) -
 fun TextView.setString(text:String) {
     this.text = text
 }
+
+fun Double.format(digits: Int) = "%.${digits}f".format(this).replace(',', '.')

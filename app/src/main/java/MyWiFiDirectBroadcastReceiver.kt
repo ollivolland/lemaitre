@@ -38,12 +38,10 @@ class MyWiFiDirectBroadcastReceiver(
 				if(!myWifiP2p.isFormed)
 					manager.requestPeers(channel) { list ->
 						// Respond to new connection or disconnections
-						if(myWifiP2p.isWantUpdateFormationDevices) {
-							list.deviceList.forEach {
-								if (!myWifiP2p.formationDevices.contains(it)) {
-									myWifiP2p.formationDevices.add(it)
-									Session.log("found ${it.deviceName}")
-								}
+						list.deviceList.forEach {
+							if (!myWifiP2p.formationDevices.contains(it)) {
+								myWifiP2p.formationDevices.add(it)
+								Session.log("found ${it.deviceName}")
 							}
 						}
 					}

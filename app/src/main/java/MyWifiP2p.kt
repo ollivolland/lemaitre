@@ -28,10 +28,9 @@ class MyWifiP2p(private val activity: MainActivity) {
 	private lateinit var hostMac:String
 	private lateinit var mySocketFormation: MySocket
 	var deviceName: String = ""
-	var isWantUpdateFormationDevices = true
 	private var isHasTriedConnectingToHost = false
-	var isWantDiscoverPeers = true
-	var isWantDiscoverServices = true
+	private var isWantDiscoverPeers = false
+	private var isWantDiscoverServices = false
 	private var isWantConnection = false
 	private var isConnected = false
 	private var isFormationSocketReady = true
@@ -43,7 +42,9 @@ class MyWifiP2p(private val activity: MainActivity) {
 	var isGroupFormed:Boolean = false;private set
 	
 	init {
-		if(get != null) throw Exception()
+		if(get != null) {
+			get!!.close()
+		}
 		get = this
 		receiver.register()
 		
@@ -117,8 +118,8 @@ class MyWifiP2p(private val activity: MainActivity) {
 		//  sockets
 		checkNeedAnotherSocket()
 		
-		//  client formation
-		if (Session.isClient && !this::mySocketFormation.isInitialized && info.groupOwnerAddress.hostAddress != null) {
+		//  client formation        needs group formed, else ex
+		if (Session.isClient && !this::mySocketFormation.isInitialized && info.groupFormed && info.groupOwnerAddress.hostAddress != null) {
 			mySocketFormation = MyClientThread(info.groupOwnerAddress.hostAddress!!, MainActivity.PORT_FORMATION).apply {
 				addOnJson { jo, tag ->
 					if (tag != JSON_TAG_CONFIG) return@addOnJson
@@ -138,7 +139,7 @@ class MyWifiP2p(private val activity: MainActivity) {
 		isConnected = info.groupFormed
 		
 		//  host reconnection
-		if(HostData.get != null)
+		if(isFormed && HostData.get != null)
 			manager.requestPeers(channel) { list ->
 				HostData.get!!.clients.forEachIndexed { i, cl ->
 					val now = list.deviceList.filter { it.deviceName == cl.name }
@@ -153,11 +154,11 @@ class MyWifiP2p(private val activity: MainActivity) {
 				}
 				
 				//  discovery
-				if(isWantDiscoverPeers && HostData.get!!.clients.all { it.isConnected }) {
+				if(isWantDiscoverPeers && (HostData.get!!.clients.isEmpty() || HostData.get!!.clients.all { it.isConnected })) {
 					Session.log("PeerDiscovery stopped")
 					stopDiscovery()
 				}
-				if(!isWantDiscoverPeers && HostData.get!!.clients.any { !it.isConnected }) {
+				if(!isWantDiscoverPeers && HostData.get!!.clients.isNotEmpty() && HostData.get!!.clients.any { !it.isConnected }) {
 					Session.log("PeerDiscovery restarted")
 					isWantDiscoverPeers = true
 				}

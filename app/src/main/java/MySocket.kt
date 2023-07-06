@@ -1,3 +1,4 @@
+import android.util.Log
 import org.json.JSONObject
 import java.io.InputStream
 import java.io.OutputStream
@@ -45,7 +46,7 @@ abstract class MySocket(val port: Int, private val type:String) {
                     } catch (_:Exception) { }
                 }
             } catch (e:Exception) {
-                e.printStackTrace()
+                Log.e("SCOKET", "exception")
                 isWantOpen = false
             }
         }

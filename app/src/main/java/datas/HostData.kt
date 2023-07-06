@@ -36,13 +36,11 @@ class HostData private constructor(val hostName:String, val clients: Array<Clien
     }
     
     fun replaceSocket(i:Int) {
-        mySockets[i].addOnClose {
-            thread {
-                Thread.sleep(2000)
-                mySockets[i] = createSocket(i)
-            }
-        }
         mySockets[i].close()
+        thread {
+            Thread.sleep(2000)
+            mySockets[i] = createSocket(i)
+        }
     }
     
     private fun createSocket(i:Int): MySocket {

@@ -57,6 +57,9 @@ class ActivityHome : AppCompatActivity() {
         vPreview.setOnClickListener {
             startActivity(Intent(this, ActivityPreview::class.java))
         }
+    
+        MyWifiP2p.get?.stopDiscovery()
+        MyWifiP2p.get?.stopNSD()
 
         //  *****   HOST
         if(Session.isHost) {
@@ -155,9 +158,6 @@ class ActivityHome : AppCompatActivity() {
         //  *****   CLIENT
         else {
             val data = ClientData.get!!
-    
-            MyWifiP2p.get?.stopDiscovery()
-            MyWifiP2p.get?.stopNSD()
             
             viewConfigMe = ViewDevice(this, vConfig)
             viewConfigMe.vTitle.text = data.deviceName
@@ -188,11 +188,11 @@ class ActivityHome : AppCompatActivity() {
                 
                 //  start starts
                 for (x in Session.getStarts())
-                    if(!ActivityStart.isBusy && !hasLaunched.contains(x.id) && x.timeOfInit < MyTimer.getTime() + TIME_START)
+                    if(!ActivityStart.isBusy && !hasLaunched.contains(x.id) && x.timeInit < MyTimer.getTime() + TIME_START)
                     {
                         hasLaunched.add(x.id)
                         ActivityStart.launch(this, x)
-                        showFeedback("[${Globals.FORMAT_TIME.format(x.timeOfInit)}] started\n")
+                        showFeedback("[${Globals.FORMAT_TIME.format(x.timeInit)}] started\n")
                         Session.log("do start $x")
                     }
 
@@ -204,8 +204,8 @@ class ActivityHome : AppCompatActivity() {
                     vImportant.setString(
                     "${Globals.FORMAT_TIME.format(MyTimer.getTime())}\n\n"+ when {
                         all.isEmpty() -> "no start scheduled"
-                        all.size < 5  -> "will start at\n${all.sortedBy { it.timeOfInit }.joinToString("\n") { Globals.FORMAT_TIME.format(it.timeOfInit) }}"
-                        else          -> "will start at\n${all.sortedBy { it.timeOfInit }.take(4).joinToString("\n") { Globals.FORMAT_TIME.format(it.timeOfInit) }}\n + ${all.size-4} others"
+                        all.size < 5  -> "will start at\n${all.sortedBy { it.timeInit }.joinToString("\n") { Globals.FORMAT_TIME.format(it.timeInit) }}"
+                        else          -> "will start at\n${all.sortedBy { it.timeInit }.take(4).joinToString("\n") { Globals.FORMAT_TIME.format(it.timeInit) }}\n + ${all.size-4} others"
                     })
                     synchronized(feedbacks) {
                         vFeedback.setString(feedbacks.reversed().joinToString("\n"))

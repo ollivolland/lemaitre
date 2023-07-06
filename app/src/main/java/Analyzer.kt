@@ -27,7 +27,7 @@ class Analyzer(private val context: Context, myCamera2: MyCamera2, private val m
 	var numBuffered = 0
 	private val buffers = ArrayList<IntBuffer?>(61 * 30)
 	private val isBroken = mutableListOf<Boolean>()
-	private val timesMs = mutableListOf<Long>()
+	private val timesMs = ArrayList<Long>(61 * 30)
 	private val numBroken = mutableListOf<Int>()
 	private val needed = mutableListOf<Int>()
 	private var isHasStreakStarted = false
@@ -36,12 +36,14 @@ class Analyzer(private val context: Context, myCamera2: MyCamera2, private val m
 	val onTriangulatedListeners = mutableListOf<(triangleMs:Long,frameMs:Long,deltas:Double)->Unit>()
 	
 	private val listenTo = ImageReader.OnImageAvailableListener {
+		val timeListened = myTimer.time   //  time without delay
 		val image = it.acquireLatestImage() ?: return@OnImageAvailableListener
 
 		try {
 			if (isWant) {
+				timesMs.add(timeListened)
 				addBuffer(image)
-				timesMs.add(image.timestamp / NANO_OVER_MILLI)
+//				timesMs.add(image.timestamp / NANO_OVER_MILLI + myTimer.timeToBoot)
 
 				if (index >= 2) {
 					isBroken[index] = isBrokenAtLine(index, index - 1)
@@ -53,7 +55,7 @@ class Analyzer(private val context: Context, myCamera2: MyCamera2, private val m
 						needed.add(index)
 						println("STREAK STARTED")
 
-						val timeFrameMs = myTimer.timeOfBoot + timesMs[index] - timeStart
+						val timeFrameMs = timesMs[index - 1] - timeStart
 						thread { for (x in onStreakStartedListeners) x(timeFrameMs) }
 					} else if (isHasStreakStarted && !isBroken[index]) {
 						isHasStreakStarted = false
@@ -166,7 +168,7 @@ class Analyzer(private val context: Context, myCamera2: MyCamera2, private val m
 				drawDiagram(yBroken)
 
 				//  time
-				val timeFrameMS = myTimer.timeOfBoot + timesMs[i] - timeStart
+				val timeFrameMS = timesMs[i - 1] - timeStart
 
 				val delta = yFirstBroken - yLastBroken
 				val deltaMS = timesMs[i] - timesMs[i - 1]

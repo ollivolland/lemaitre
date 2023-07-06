@@ -1,8 +1,6 @@
 package datas
 
-import GpsTime
 import MySocket
-import com.ollivolland.lemaitre.MyApp
 import org.json.JSONObject
 
 class Session {
@@ -19,11 +17,6 @@ class Session {
         
         var isHost:Boolean = false;private set
         var isClient:Boolean = false;private set
-        
-        init {
-            //  misc
-            GpsTime.register(MyApp.appContext)
-        }
         
         fun setState(state: State) {
             synchronized(mState) {

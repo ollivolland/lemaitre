@@ -2,9 +2,14 @@ package com.ollivolland.lemaitre
 
 import Analyzer
 import MyTimer
+import android.annotation.SuppressLint
 import android.content.Intent
+import android.media.AudioFormat
+import android.media.AudioRecord
 import android.media.MediaPlayer
+import android.media.MediaRecorder
 import android.os.Bundle
+import android.util.Log
 import android.view.TextureView
 import android.view.View
 import android.view.WindowManager
@@ -13,10 +18,13 @@ import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
 import datas.Session
 import datas.StartData
+import format
 import mycamera2.MyCamera2
 import mycamera2.MyRecorder
+import java.util.*
 import kotlin.concurrent.thread
 import kotlin.math.abs
+
 
 class ActivityStart : AppCompatActivity() {
     lateinit var timer:MyTimer
@@ -30,6 +38,7 @@ class ActivityStart : AppCompatActivity() {
     private var isGateMpReady = true
     private lateinit var gateMp:MediaPlayer
 
+    @SuppressLint("MissingPermission")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_start)
@@ -81,9 +90,9 @@ class ActivityStart : AppCompatActivity() {
         
         //  Gate
         if(start.config.isGate) {
-            analyzer = Analyzer(this, myCamera2, timer, start.timeOfInit + start.timeToCommand)
+            analyzer = Analyzer(this, myCamera2, timer, start.timeOfCommand)
             analyzer.onStreakStartedListeners.add {
-                val msg = "gate: ${it/1000}.${String.format("%03d", it%1000)} s"
+                val msg = "gate: ${(it * .001).format(2)}s"
                 runOnUiThread { vLog.text = "${vLog.text}\n$msg" }
                 
                 if(isGateMpReady) {
@@ -92,8 +101,8 @@ class ActivityStart : AppCompatActivity() {
                 }
             }
             analyzer.onTriangulatedListeners.add { triangleMs, frameMs, deltas ->
-                val gate = if(triangleMs == 0L) "invalid" else "${String.format("%.3f", triangleMs * 0.001)}s"
-                val msg = "gate: $gate   (${String.format("%.2f", frameMs * 0.001)}Δ${if(deltas<0) "-" else "+"}${String.format("%.1f", abs(deltas))})"
+                val gate = if(triangleMs == 0L) "invalid" else "${(triangleMs * .001).format(2)}s"
+                val msg = "gate: $gate   (${(frameMs * .001).format(2)}Δ${if(deltas<0) "-" else "+"}${abs(deltas).format(1)})"
                 
                 showFeedback?.invoke(msg)
                 broadcastFeedback?.invoke(msg)
@@ -119,16 +128,71 @@ class ActivityStart : AppCompatActivity() {
         //  mps
         if(start.config.isCommand) {
             mps.addAll(Array(start.mpIds.size) { i -> MediaPlayer.create(this, start.mpIds[i]) })
-            if(Session.isHost) {
-                val duration = mps.last().duration
-                val audioShouldStartAtMs = start.mpStarts.last()
-                mps.last().setOnCompletionListener {
-                    val delta = timer.time - duration - audioShouldStartAtMs
-                    showFeedback?.invoke("delay: $delta ms")
+            
+            //  delay checker
+            if(Session.isHost)
+                thread {
+                    try {
+                        val sampleRate = 8000
+                        val bufferSize = AudioRecord.getMinBufferSize(
+                            sampleRate, AudioFormat.CHANNEL_IN_MONO,
+                            AudioFormat.ENCODING_PCM_16BIT
+                        )
+                        val audio = AudioRecord(
+                            MediaRecorder.AudioSource.MIC, sampleRate,
+                            AudioFormat.CHANNEL_IN_MONO,
+                            AudioFormat.ENCODING_PCM_16BIT, bufferSize
+                        )
+                        val buffer = ShortArray(bufferSize)
+                        var bufferReadResult: Int
+    
+                        timer.lock(start.timeOfCommand - 500)
+                        audio.startRecording()
+                        val levels = mutableListOf<Short>()
+                        val startAtMs: Long
+    
+                        while (true)
+                        {
+                            bufferReadResult = audio.read(buffer, 0, bufferSize)
+                            for (ii in 0 until bufferReadResult)
+                                levels.add(buffer[ii])
+                            
+                            if(levels.size >= sampleRate * 1.5)
+                            {
+                                startAtMs = timer.time - (levels.size * 1000L / sampleRate)
+                                break
+                            }
+                        }
+    
+                        audio.stop()
+                        audio.release()
+                        
+                        val hundreds = Array(levels.size / 80) { 0L }
+                        for (i in hundreds.indices)
+                            for (ii in 0 until 80)
+                                hundreds[i] += abs(levels[i*80+ii].toLong())
+                        
+                        val threshold = hundreds.max() / 2
+                        var isHasFound = false
+                        for (i in hundreds.indices)
+                        {
+                            val time = startAtMs + i*10 - start.timeOfCommand
+                            
+                            if(!isHasFound && hundreds[i] >= threshold) {
+                                isHasFound = true
+                                println("FOUND level [${"%05d".format(time)} ms] = ${hundreds[i]}")
+                                showFeedback?.invoke("shot: ${(time * .001).format(2)}s")
+                            }
+                            else
+                                println("level [${"%05d".format(time)} ms] = ${hundreds[i]}")
+                        }
+                    } catch (e: Exception) {
+                        Log.e("TrackingFlow", "Exception", e)
+                    }
                 }
-            }
+            
+            //  audios
             mps.add(MediaPlayer.create(this, R.raw.whitenoise_point_001db)) //  needs to play non-silent audio for box
-
             for (i in start.mpIds.indices) {
                 thread {
                     timer.lock(start.mpStarts[i])
@@ -142,16 +206,16 @@ class ActivityStart : AppCompatActivity() {
 
         thread {
             while (isBusy) {
-                if(timer.time >= start.timeOfInit + start.timeToCommand + start.videoLength + DURATION_WAIT_AFTER_FINISH) finish()
+                if(timer.time >= start.timeOfCommand + start.videoLength + DURATION_WAIT_AFTER_FINISH) finish()
                 
                 //  camera
-                if(!isCameraStarted && timer.time >= start.timeOfInit + start.timeToCommand - DURATION_VIDEO_BEFORE_START) {
+                if(!isCameraStarted && timer.time >= start.timeOfCommand - DURATION_VIDEO_BEFORE_START) {
                     isCameraStarted = true
                     myRecorder.startRecord()
                     
                     runOnUiThread { vLog.text = "${vLog.text}\nvideo started" }
                 }
-                if(!isCameraStopped && timer.time >= start.timeOfInit + start.timeToCommand + start.videoLength) {
+                if(!isCameraStopped && timer.time >= start.timeOfCommand + start.videoLength) {
                     isCameraStopped = true
                     myRecorder.stopRecord()
                     
@@ -159,13 +223,13 @@ class ActivityStart : AppCompatActivity() {
                 }
                 
                 //  gate
-                if(!isGateStarted && timer.time >= start.timeOfInit + start.timeToCommand) {
+                if(!isGateStarted && timer.time >= start.timeOfCommand) {
                     isGateStarted = true
                     analyzer.isWant = true
                     
                     runOnUiThread { vLog.text = "${vLog.text}\ngate started" }
                 }
-                if(!isGateStopped && timer.time >= start.timeOfInit + start.timeToCommand + start.videoLength) {
+                if(!isGateStopped && timer.time >= start.timeOfCommand + start.videoLength) {
                     isGateStopped = true
                     analyzer.stop()
                     

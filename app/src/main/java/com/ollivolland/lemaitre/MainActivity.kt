@@ -3,6 +3,7 @@ package com.ollivolland.lemaitre
 import GpsTime
 import MyWifiP2p
 import android.Manifest
+import android.app.Activity
 import android.content.Context
 import android.content.Intent
 import android.content.IntentSender
@@ -16,7 +17,6 @@ import android.view.View
 import android.widget.Button
 import android.widget.TextView
 import android.widget.Toast
-import androidx.appcompat.app.AppCompatActivity
 import com.google.android.gms.common.api.ResolvableApiException
 import com.google.android.gms.location.LocationRequest
 import com.google.android.gms.location.LocationServices
@@ -29,7 +29,7 @@ import setString
 import kotlin.concurrent.thread
 
 
-class MainActivity : AppCompatActivity() {
+class MainActivity : Activity() {
     //  by urgency
     //  todo    retransmit on reconnect
     //  todo    check if cam profile is available
@@ -121,6 +121,7 @@ class MainActivity : AppCompatActivity() {
 
         //  setup
         Session.log("sdk ${Build.VERSION.SDK_INT}")
+        Session.log("version ${applicationContext.packageManager.getPackageInfo(applicationContext.packageName, 0).versionCode}")
 
         //  enable wifi
         if(!wifiManager.isWifiEnabled) {

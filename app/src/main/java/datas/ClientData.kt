@@ -4,13 +4,14 @@ import MyServerThread
 import MySocket
 import MyTimer
 import android.content.Intent
+import com.google.firebase.crashlytics.FirebaseCrashlytics
 import com.ollivolland.lemaitre.ActivityHome
 import com.ollivolland.lemaitre.MainActivity
 import org.json.JSONObject
 import kotlin.concurrent.thread
 
 class ClientData private constructor(val port: Int, val hostMac:String, val deviceName:String, private var mainActivity: MainActivity?) {
-    lateinit var mySocket: MySocket
+    var mySocket: MySocket
     var lastUpdate = MyTimer.getTime()
     var isHasHostGps = false
 
@@ -19,8 +20,16 @@ class ClientData private constructor(val port: Int, val hostMac:String, val devi
     }
     
     fun replaceSocket() {
-        mySocket.close()
-        mySocket = createSocket()
+        try {
+            mySocket.addOnClose {
+                mySocket = createSocket()
+            }
+            mySocket.close()
+        }
+        catch (e:Exception) {
+            Session.log("reconnection crashed")
+            FirebaseCrashlytics.getInstance().recordException(e)
+        }
     }
     
     private fun createSocket(): MyServerThread {

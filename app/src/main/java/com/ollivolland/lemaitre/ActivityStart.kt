@@ -24,6 +24,7 @@ import mycamera2.MyRecorder
 import java.util.*
 import kotlin.concurrent.thread
 import kotlin.math.abs
+import kotlin.math.ln
 
 
 class ActivityStart : AppCompatActivity() {
@@ -127,7 +128,18 @@ class ActivityStart : AppCompatActivity() {
 
         //  mps
         if(start.config.isCommand) {
-            mps.addAll(Array(start.mpIds.size) { i -> MediaPlayer.create(this, start.mpIds[i]) })
+            val MAX_VOLUME = 100.0 + 1
+            val volumeShot = (1 - (ln(MAX_VOLUME - 100) / ln(MAX_VOLUME))).toFloat()
+            val volumeMisc = (1 - (ln(MAX_VOLUME - 25) / ln(MAX_VOLUME))).toFloat()
+            
+            mps.addAll(Array(start.mpIds.size) { i ->
+                MediaPlayer.create(this, start.mpIds[i]).apply {
+                    if(i == start.mpIds.size - 1)
+                        setVolume(volumeShot, volumeShot)
+                    else
+                        setVolume(volumeMisc, volumeMisc)
+                }
+            })
             
             //  delay checker
             if(Session.isHost)

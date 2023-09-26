@@ -18,7 +18,6 @@ import android.util.Range
 import android.util.Size
 import android.view.Surface
 import android.view.TextureView
-import androidx.core.app.ActivityCompat
 import kotlin.math.max
 
 
@@ -53,17 +52,22 @@ class MyCamera2(val context: Activity) {
 		val characteristics = cameraManager.getCameraCharacteristics(cameraId)
 		val capabilities = characteristics.get(CameraCharacteristics.REQUEST_AVAILABLE_CAPABILITIES)
 		val streamConfigurationMap = characteristics.get(CameraCharacteristics.SCALER_STREAM_CONFIGURATION_MAP)
+		sizes = streamConfigurationMap?.getOutputSizes(ImageFormat.JPEG) ?: emptyArray()
 		
 //		val cams = characteristics.physicalCameraIds
 //		val maxZoom = characteristics[CameraCharacteristics.SCALER_AVAILABLE_MAX_DIGITAL_ZOOM]
-		sizes = streamConfigurationMap?.getOutputSizes(ImageFormat.JPEG) ?: emptyArray()
 //		val ss = characteristics[CameraCharacteristics.SENSOR_INFO_PHYSICAL_SIZE]!!
-//		val foc = characteristics[CameraCharacteristics.LENS_INFO_AVAILABLE_FOCAL_LENGTHS]!![0]
+//		val z = characteristics[CameraCharacteristics.SENSOR_INFO_PIXEL_ARRAY_SIZE]!!
+//		val foc = characteristics[CameraCharacteristics.LENS_INFO_AVAILABLE_FOCAL_LENGTHS]!!
+//		println("pixel size = $ss")
+//		println("z = $z")
+//		for (x in foc)
+//			println("focal length = $x")
 //		val angleW = 2 * atan(ss.width * .5 * foc)
 //		val angleH = 2 * atan(ss.height * .5 * foc)
 		
 		//  (1) open cameraDevice
-		if (ActivityCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED)
+		if (context.checkSelfPermission(Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED)
 			cameraManager.openCamera(cameraId, object: CameraDevice.StateCallback() {
 				override fun onOpened(p0: CameraDevice) {
 					Log.i(TAG, "camera: opened ${p0.id}")

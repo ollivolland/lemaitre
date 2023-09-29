@@ -40,7 +40,6 @@ class MainActivity : Activity() {
     //  todo    dialog spinner info
     //  todo    separate home warnings and errors
     //  todo    home disable buttons on error
-    //  todo    set volume to 10
     //  todo    camera & gate orientation
     //  todo    display storage space
     

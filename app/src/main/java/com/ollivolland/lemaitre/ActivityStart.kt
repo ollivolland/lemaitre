@@ -130,7 +130,7 @@ class ActivityStart : AppCompatActivity() {
         if(start.config.isCommand) {
             val MAX_VOLUME = 100.0 + 1
             val volumeShot = (1 - (ln(MAX_VOLUME - 100) / ln(MAX_VOLUME))).toFloat()
-            val volumeMisc = (1 - (ln(MAX_VOLUME - 25) / ln(MAX_VOLUME))).toFloat()
+            val volumeMisc = (1 - (ln(MAX_VOLUME - 50) / ln(MAX_VOLUME))).toFloat()
             
             mps.addAll(Array(start.mpIds.size) { i ->
                 MediaPlayer.create(this, start.mpIds[i]).apply {

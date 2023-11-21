@@ -26,6 +26,7 @@ import datas.ClientData
 import datas.HostData
 import datas.Session
 import setString
+import java.io.File
 import kotlin.concurrent.thread
 
 
@@ -70,6 +71,11 @@ class MainActivity : Activity() {
         val toGrant = permissions.filter { s -> checkSelfPermission(s) != PackageManager.PERMISSION_GRANTED }.toTypedArray()
 
         if (toGrant.isNotEmpty()) requestPermissions(toGrant, 1)
+        
+        //  files
+        val dir = getExternalFilesDir(null)
+        if(!File("$dir\\$PATH_SENSITIVITY").exists())
+            File("$dir\\$PATH_SENSITIVITY").writeText("1000")
 
         //  ui
         val vHost = findViewById<Button>(R.id.buttonHost)
@@ -195,6 +201,7 @@ class MainActivity : Activity() {
         const val PORT_COMMUNICATION = 8900 //  +10
         const val SERVICE_NAME = "_ollivollandlemaitre"
         const val SERVICE_TYPE = "_presence._tcp"
+        const val PATH_SENSITIVITY = "sensitivity.txt"
     }
 }
 

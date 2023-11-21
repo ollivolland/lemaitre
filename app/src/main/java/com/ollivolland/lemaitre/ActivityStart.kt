@@ -21,6 +21,7 @@ import datas.StartData
 import format
 import mycamera2.MyCamera2
 import mycamera2.MyRecorder
+import java.io.File
 import java.util.*
 import kotlin.concurrent.thread
 import kotlin.math.abs
@@ -76,12 +77,12 @@ class ActivityStart : AppCompatActivity() {
                     1 -> {
                         width = 2560
                         height = 1440
-                        bytesPerSecond = 10_000_000
+                        bytesPerSecond = 20_000_000
                     }
                     2 -> {
                         width = 3840
                         height = 2160
-                        bytesPerSecond = 10_000_000
+                        bytesPerSecond = 20_000_000
                     }
                 }
             })
@@ -91,7 +92,9 @@ class ActivityStart : AppCompatActivity() {
         
         //  Gate
         if(start.config.isGate) {
-            analyzer = Analyzer(this, myCamera2, timer, start.timeOfCommand)
+            val sens = File("${getExternalFilesDir(null)}\\${MainActivity.PATH_SENSITIVITY}").readText().toInt()
+            runOnUiThread { vLog.text = "${vLog.text}\nsens = $sens" }
+            analyzer = Analyzer(this, myCamera2, timer, start.timeOfCommand, sens)
             analyzer.onStreakStartedListeners.add {
                 val msg = "gate: ${(it * .001).format(2)}s"
                 runOnUiThread { vLog.text = "${vLog.text}\n$msg" }
@@ -102,7 +105,7 @@ class ActivityStart : AppCompatActivity() {
                 }
             }
             analyzer.onTriangulatedListeners.add { triangleMs, frameMs, deltas ->
-                val gate = if(triangleMs == 0L) "invalid" else "${(triangleMs * .001).format(2)}s"
+                val gate = if(triangleMs == 0L) "${(frameMs * .001).format(2)}s?" else "${(triangleMs * .001).format(2)}s"
                 val msg = "gate: $gate   (${(frameMs * .001).format(2)}Δ${if(deltas<0) "-" else "+"}${abs(deltas).format(1)})"
                 
                 showFeedback?.invoke(msg)

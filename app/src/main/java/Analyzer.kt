@@ -16,7 +16,7 @@ import kotlin.math.absoluteValue
 import kotlin.math.min
 
 
-class Analyzer(private val context: Context, myCamera2: MyCamera2, private val myTimer: MyTimer, private val timeStart:Long) {
+class Analyzer(private val context: Context, myCamera2: MyCamera2, private val myTimer: MyTimer, private val timeStart:Long, private val SENSITIVITY:Int) {
 	private var index = 0
 	var isWant = false
 	private val session = Globals.FORMAT_TIME_FILE.format(myTimer.time)!!
@@ -46,7 +46,10 @@ class Analyzer(private val context: Context, myCamera2: MyCamera2, private val m
 //				timesMs.add(image.timestamp / NANO_OVER_MILLI + myTimer.timeToBoot)
 
 				if (index >= 2) {
-					isBroken[index] = isBrokenAtLine(index, index - 1)
+					isBroken[index] = isBrokenAtLine(index, index - 1, HEIGHT / 2)
+							|| isBrokenAtLine(index, index - 1, HEIGHT / 4)
+							|| isBrokenAtLine(index, index - 1, HEIGHT * 3 / 4)
+					
 					numBroken[index] = numThisBroken
 
 					if (!isHasStreakStarted && isBroken[index] && needed.count { it > 0 } < MAX_IMAGES_CONCURRENT) {
@@ -243,15 +246,16 @@ class Analyzer(private val context: Context, myCamera2: MyCamera2, private val m
 		numBroken.add(0)
 	}
 	
-	private fun isBrokenAtLine(bmp1: Int, bmp2: Int):Boolean {
+	private fun isBrokenAtLine(bmp1: Int, bmp2: Int, y:Int):Boolean {
 		numThisBroken = 0
-		val yIndex = HALF_HEIGHT * WIDTH
+		val yIndex = y * WIDTH
 		
 		for (x in 0 until WIDTH)
 			if(isBroken(bmp1, bmp2, yIndex+x))
-				numThisBroken++
+				if((numThisBroken++) >= MIN_LINE_BROKEN_FOR_REGISTER)
+					return true
 		
-		return numThisBroken >= MIN_LINE_BROKEN_FOR_REGISTER
+		return false
 	}
 	
 	private fun isBroken(bmp1: Int, bmp2: Int, index:Int):Boolean {
@@ -267,9 +271,8 @@ class Analyzer(private val context: Context, myCamera2: MyCamera2, private val m
 	companion object {
 		const val WIDTH = 1280
 		const val HEIGHT = 720
-		const val SENSITIVITY = 1097 //  195075 * p^2
 		const val HALF_HEIGHT = HEIGHT/2
-		const val MIN_LINE_BROKEN_FOR_REGISTER = (WIDTH * .15).toInt()
+		const val MIN_LINE_BROKEN_FOR_REGISTER = (WIDTH * .25).toInt()
 		const val IMG_SKIP_MIN = .1
 		const val NANO_OVER_MILLI = 1E6.toLong()
 		const val FACTOR_MIN_BROKEN_FOR_BODY = .7

@@ -54,18 +54,6 @@ class MyCamera2(val context: Activity) {
 		val streamConfigurationMap = characteristics.get(CameraCharacteristics.SCALER_STREAM_CONFIGURATION_MAP)
 		sizes = streamConfigurationMap?.getOutputSizes(ImageFormat.JPEG) ?: emptyArray()
 		
-//		val cams = characteristics.physicalCameraIds
-//		val maxZoom = characteristics[CameraCharacteristics.SCALER_AVAILABLE_MAX_DIGITAL_ZOOM]
-//		val ss = characteristics[CameraCharacteristics.SENSOR_INFO_PHYSICAL_SIZE]!!
-//		val z = characteristics[CameraCharacteristics.SENSOR_INFO_PIXEL_ARRAY_SIZE]!!
-//		val foc = characteristics[CameraCharacteristics.LENS_INFO_AVAILABLE_FOCAL_LENGTHS]!!
-//		println("pixel size = $ss")
-//		println("z = $z")
-//		for (x in foc)
-//			println("focal length = $x")
-//		val angleW = 2 * atan(ss.width * .5 * foc)
-//		val angleH = 2 * atan(ss.height * .5 * foc)
-		
 		//  (1) open cameraDevice
 		if (context.checkSelfPermission(Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED)
 			cameraManager.openCamera(cameraId, object: CameraDevice.StateCallback() {
@@ -147,6 +135,8 @@ class MyCamera2(val context: Activity) {
 					//  (3) create Request, only ONE Request is allowed!
 					val captureBuilder = cameraDeviceObservable.value.createCaptureRequest(CameraDevice.TEMPLATE_RECORD)
 					captureBuilder[CaptureRequest.CONTROL_AF_MODE] = CaptureRequest.CONTROL_AF_MODE_CONTINUOUS_PICTURE
+					captureBuilder[CaptureRequest.CONTROL_AE_MODE] = CaptureRequest.CONTROL_AE_MODE_ON
+					captureBuilder[CaptureRequest.CONTROL_AWB_MODE] = CaptureRequest.CONTROL_AWB_MODE_AUTO
 					captureBuilder[CaptureRequest.CONTROL_AE_TARGET_FPS_RANGE] = Range(fps, fps)
 
 					for (surface in surfaces)

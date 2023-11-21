@@ -61,7 +61,7 @@ class ConfigData(val deviceName:String, private val isHost:Boolean = false) {
             copy.isGate = isChecked
             
             if(copy.isGate) {
-                vSpinnerFps.setSelection(0)    //  set to 30 fps
+                vSpinnerFps.setSelection(1)    //  set to 60 fps
                 vSpinnerFps.isEnabled = false
             }
             else vSpinnerFps.isEnabled = true

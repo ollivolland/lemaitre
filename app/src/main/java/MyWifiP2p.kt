@@ -67,6 +67,10 @@ class MyWifiP2p(private val activity: MainActivity) {
 		}
 		
 		mConnectionInfoListener = WifiP2pManager.ConnectionInfoListener(this::onConnectionInfo)
+		requestConnectionInfo()
+	}
+	
+	fun requestConnectionInfo() {
 		manager.requestConnectionInfo(channel, mConnectionInfoListener)
 	}
 	

@@ -25,7 +25,6 @@ import java.io.File
 import java.util.*
 import kotlin.concurrent.thread
 import kotlin.math.abs
-import kotlin.math.ln
 
 
 class ActivityStart : AppCompatActivity() {
@@ -131,9 +130,9 @@ class ActivityStart : AppCompatActivity() {
 
         //  mps
         if(start.config.isCommand) {
-            val MAX_VOLUME = 100.0 + 1
-            val volumeShot = (1 - (ln(MAX_VOLUME - 100) / ln(MAX_VOLUME))).toFloat()
-            val volumeMisc = (1 - (ln(MAX_VOLUME - 50) / ln(MAX_VOLUME))).toFloat()
+//            val MAX_VOLUME = 100.0 + 1
+            val volumeShot:Float = 1.00f  //(1 - (ln(MAX_VOLUME - 100) / ln(MAX_VOLUME))).toFloat()
+            val volumeMisc:Float = 0.30f    //(1 - (ln(MAX_VOLUME - 75) / ln(MAX_VOLUME))).toFloat()
             
             mps.addAll(Array(start.mpIds.size) { i ->
                 MediaPlayer.create(this, start.mpIds[i]).apply {

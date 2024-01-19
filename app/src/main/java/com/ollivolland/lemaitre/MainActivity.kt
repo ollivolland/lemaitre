@@ -193,6 +193,7 @@ class MainActivity : Activity() {
         if(requestCode == 1000 || requestCode == 1001) {
             println("GPS activity result")
             GpsTime.register(MyApp.appContext)
+            myWifiP2p.requestConnectionInfo()
         }
     }
 

@@ -1,0 +1,79 @@
+<resources>
+    <!-- Base application theme. -->
+    <style name="Theme.Lemaitre" parent="Theme.AppCompat.DayNight.NoActionBar">
+        <item name="colorSurface">@color/background</item>
+    
+        <!-- background -->
+        <item name="android:windowBackground">@color/background</item>
+        <item name="android:statusBarColor">@color/background</item>
+        <item name="android:navigationBarColor">@color/background</item>
+        <item name="android:windowLightStatusBar">true</item>
+        <item name="android:windowLightNavigationBar">true</item>
+        <item name="android:textColor">@color/onBackground</item>
+        
+        <!-- Primary brand color. -->
+        <item name="colorPrimary">@color/primary</item>
+        <item name="colorPrimaryVariant">@color/purple_700</item>
+        <item name="colorOnPrimary">@color/on_primary</item>
+        
+        <!-- Secondary brand color. -->
+        <item name="colorSecondary">@color/teal_200</item>
+        <item name="colorSecondaryVariant">@color/teal_700</item>
+        <item name="colorOnSecondary">@color/black</item>
+        
+        <!-- Customize your theme here. -->
+        <item name="switchStyle">@style/Theme.Lemaitre2.Switch</item>
+    </style>
+
+    <style name="Theme.Lemaitre.Translucent" parent="Theme.Lemaitre">
+        <item name="android:windowTranslucentStatus">true</item>
+        <item name="android:windowTranslucentNavigation">true</item>
+    </style>
+    
+    <!-- STYLES -->
+    
+    <style name="Theme.Lemaitre2.Button" parent="Widget.AppCompat.Button">
+        <item name="android:background">@drawable/button_selector</item>
+        <item name="android:textColor">?colorOnPrimary</item>
+    </style>
+    
+    <style name="Theme.Lemaitre2.ImageButton" parent="Widget.AppCompat.ImageButton">
+        <item name="android:background">@drawable/button_selector</item>
+        <item name="android:textColor">?colorOnPrimary</item>
+    </style>
+    
+    <style name="Theme.Lemaitre2.Switch" parent="Widget.AppCompat.CompoundButton.Switch">
+        <item name="thumbTint">@color/switch_thumb_selector</item>
+        <item name="trackTint">@color/switch_track_selector</item>
+        <item name="android:textColor">@color/onBackground</item>
+    </style>
+    
+    <!--    COLORS  -->
+    
+    
+    <color name="background">#ffffff</color>
+    <color name="onBackground">#808080</color>
+    
+    <color name="primary">#D99445</color>
+    <color name="primary_dark">#593D1D</color>
+    <color name="primary_light">#FFBC85</color>
+    
+    <color name="primary_complement">#11688C</color>
+    <color name="primary_complement_light">#9DCAFF</color>
+    <color name="on_primary">#ffffff</color>
+    
+    <color name="purple_200">#FFBB86FC</color>
+    <!--    <color name="primary">#22AB74</color>-->
+    <!--    <color name="primary">#A8763E</color>-->
+    <!--    <color name="primary">#355AA8</color>-->
+    <!--    <color name="primary">#FF6200EE</color>-->
+    <color name="purple_700">#FF3700B3</color>
+    <!--    <color name="secondary">#6F1A07</color>-->
+    <color name="secondary">#811</color>
+    <color name="teal_200">#FF03DAC5</color>
+    <color name="teal_700">#FF018786</color>
+    <color name="black">#FF000000</color>
+    <color name="white">#FFFFFFFF</color>
+    <color name="error">#d11</color>
+    
+</resources>

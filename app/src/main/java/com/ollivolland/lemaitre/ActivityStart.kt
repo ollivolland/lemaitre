@@ -3,9 +3,12 @@ package com.ollivolland.lemaitre
 import Analyzer
 import MyTimer
 import android.annotation.SuppressLint
+import android.content.Context
 import android.content.Intent
 import android.media.AudioFormat
+import android.media.AudioManager
 import android.media.AudioRecord
+import android.media.AudioTrack
 import android.media.MediaPlayer
 import android.media.MediaRecorder
 import android.os.Bundle
@@ -22,9 +25,14 @@ import format
 import mycamera2.MyCamera2
 import mycamera2.MyRecorder
 import java.io.File
+import java.io.InputStream
+import java.nio.ByteBuffer
+import java.nio.ByteOrder
 import java.util.*
 import kotlin.concurrent.thread
 import kotlin.math.abs
+import kotlin.math.min
+import kotlin.math.sin
 
 
 class ActivityStart : AppCompatActivity() {
@@ -134,14 +142,6 @@ class ActivityStart : AppCompatActivity() {
             val volumeShot:Float = 1.00f  //(1 - (ln(MAX_VOLUME - 100) / ln(MAX_VOLUME))).toFloat()
             val volumeMisc:Float = 0.30f    //(1 - (ln(MAX_VOLUME - 75) / ln(MAX_VOLUME))).toFloat()
             
-            mps.addAll(Array(start.mpIds.size) { i ->
-                MediaPlayer.create(this, start.mpIds[i]).apply {
-                    if(i == start.mpIds.size - 1)
-                        setVolume(volumeShot, volumeShot)
-                    else
-                        setVolume(volumeMisc, volumeMisc)
-                }
-            })
             
             //  delay checker
             if(Session.isHost)
@@ -171,7 +171,7 @@ class ActivityStart : AppCompatActivity() {
                             for (ii in 0 until bufferReadResult)
                                 levels.add(buffer[ii])
                             
-                            if(levels.size >= sampleRate * 1.5)
+                            if(levels.size >= sampleRate * 1)   //  more than 1s
                             {
                                 startAtMs = timer.time - (levels.size * 1000L / sampleRate)
                                 break
@@ -206,16 +206,33 @@ class ActivityStart : AppCompatActivity() {
                 }
             
             //  audios
-            mps.add(MediaPlayer.create(this, R.raw.whitenoise_point_001db)) //  needs to play non-silent audio for box
-            for (i in start.mpIds.indices) {
-                thread {
-                    timer.lock(start.mpStarts[i])
-                    if(!this.isDestroyed) mps[i].start()
-                }
-            }
+//            mps.add(MediaPlayer.create(this, R.raw.whitenoise_point_001db)) //  needs to play non-silent audio for box
+            val sampleRate = 44100
+            val duration = ((start.mpStarts.last() - start.mpStarts[0]) * 1E-3 + 5).toInt()
+            val music = FloatArray(duration * sampleRate)
+            val at = AudioTrack(AudioManager.STREAM_MUSIC, sampleRate,
+                AudioFormat.CHANNEL_CONFIGURATION_MONO, AudioFormat.ENCODING_PCM_FLOAT,
+                music.size * Float.SIZE_BYTES, AudioTrack.MODE_STATIC
+            )
+            generateSine(0.0, music, 0.01, 440, duration.toDouble())
+            for(i in start.mpIds.indices)
+                play(this, start.mpIds[i], music, amplitude = 1f, startAtSeconds = (start.mpStarts[i] - start.mpStarts[0]) * 1E-3)
             
-            mps.last().isLooping = true
-            mps.last().start()
+            at.write(music, 0, music.size, AudioTrack.WRITE_NON_BLOCKING)
+            thread {
+                timer.lock(start.mpStarts[0])
+                at.play()
+                Thread.sleep((duration * 1E3).toLong())
+                at.stop()
+                at.release()
+            }
+//            thread {
+//                timer.lock(start.mpStarts[0])
+//                if(!this.isDestroyed) mps[0].start()
+//            }
+//
+//            mps.last().isLooping = true
+//            mps.last().start()
         }
 
         thread {
@@ -287,6 +304,36 @@ class ActivityStart : AppCompatActivity() {
             this.showFeedback = activityHome::showFeedback
 
             activityHome.startActivity(Intent(activityHome, ActivityStart::class.java))
+        }
+        
+        
+        private fun generateSine(startAtSeconds:Double, music:FloatArray, amplitude: Double, freq:Int, endAfterSeconds: Double) {
+            val sampleRate = 44100
+            val index = (startAtSeconds * sampleRate).toInt()
+            val endAtIndex = index + (endAfterSeconds * sampleRate).toInt()
+            
+            for (i in index until endAtIndex) {
+                music[i] = (sin(i * 2 * Math.PI / sampleRate * freq) * amplitude).toFloat()
+            }
+        }
+        
+        private fun play(c:Context, id:Int, music:FloatArray, amplitude:Float = 1f, startAtSeconds:Double = 0.0, endAfterSeconds:Double = 999.0) {
+            val sampleRate = 44100
+            val inputStream: InputStream = c.resources.openRawResource(id)
+            inputStream.skip(44)
+            var index = (startAtSeconds * sampleRate).toInt()
+            val endAfter = (endAfterSeconds * sampleRate).toInt()
+            
+            val typed = ByteBuffer
+                .wrap(inputStream.readBytes())
+                .order(ByteOrder.LITTLE_ENDIAN)
+                .asFloatBuffer()
+            val array = FloatArray(typed.capacity())
+            typed.get(array)
+            
+            val length = min(array.size, endAfter)
+            for (i in 0 until length)
+                music[index++] = array[i] * amplitude
         }
     }
 }

@@ -32,6 +32,7 @@ import kotlin.concurrent.thread
 
 class MainActivity : Activity() {
     //  by urgency
+    //  todo    CRASHES CAUSE of gps permisson
     //  todo    retransmit on reconnect
     //  todo    check if cam profile is available
     //  todo    host send delay&gate, display only once both received
@@ -52,7 +53,7 @@ class MainActivity : Activity() {
     private val wifiManager: WifiManager by lazy { applicationContext.getSystemService(Context.WIFI_SERVICE) as WifiManager }
     private val locationManager: LocationManager by lazy { getSystemService(Context.LOCATION_SERVICE) as LocationManager }
     private var isRunning = true
-    lateinit var myWifiP2p:MyWifiP2p
+    private lateinit var myWifiP2p:MyWifiP2p
     
     private lateinit var vLogger:TextView
     private lateinit var vFeedback:TextView

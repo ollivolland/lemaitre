@@ -8,7 +8,6 @@ import android.app.Dialog
 import android.content.Context
 import android.widget.Spinner
 import android.widget.TextView
-import com.google.firebase.crashlytics.FirebaseCrashlytics
 import com.ollivolland.lemaitre.R
 import config
 import org.json.JSONObject
@@ -38,17 +37,14 @@ class HostData private constructor(val hostName:String, val clients: Array<Clien
     
     fun replaceSocket(i:Int) {
         try {
-            mySockets[i].addOnClose {
-                thread {
-                    Thread.sleep(2000)
-                    mySockets[i] = createSocket(i)
-                }
-            }
-            mySockets[i].close()
+            mySockets[i] = createSocket(i)
         }
         catch (e:Exception) {
             Session.log("reconnection crashed")
-            FirebaseCrashlytics.getInstance().recordException(e)
+            thread {
+                Thread.sleep(4000)
+                replaceSocket(i)
+            }
         }
     }
     

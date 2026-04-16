@@ -32,10 +32,11 @@ class MyWifiP2p(private val activity: MainActivity) {
 	private var isWantConnection = false
 	private var isConnected = false
 	private var isFormationSocketReady = true
-	private var isHasClientReconnected = false
+	private var wantNewClientReconnectionTry = true
 	private var isOpen = true
 	var isFinished = false
 	var isGroupFormed:Boolean = false;private set
+	var lastConnectionInfo = 0L
 	
 	init {
 		if(get != null) {
@@ -53,6 +54,11 @@ class MyWifiP2p(private val activity: MainActivity) {
 				if(isWantDiscoverServices)
 					manager.discoverServices(channel, MyWifiP2pActionListener("discoverServices"))
 
+				if(lastConnectionInfo + 1000L < System.currentTimeMillis()) {
+					lastConnectionInfo = System.currentTimeMillis()
+					requestConnectionInfo()
+				}
+
 				Thread.sleep(100)
 			}
 		}
@@ -64,7 +70,7 @@ class MyWifiP2p(private val activity: MainActivity) {
 		manager.requestConnectionInfo(channel, mConnectionInfoListener)
 	}
 	
-	private fun createFormationSocket() {
+	private fun tryCreateFormationSocket() {
 		if(isFinished) return
 		
 		if (Session.isHost && isFormationSocketReady) {
@@ -91,7 +97,7 @@ class MyWifiP2p(private val activity: MainActivity) {
 				}
 				addOnClose {
 					isFormationSocketReady = true
-					createFormationSocket()
+					tryCreateFormationSocket()
 				}
 				log(Session.Companion::log)
 			}
@@ -111,17 +117,17 @@ class MyWifiP2p(private val activity: MainActivity) {
 		
 		//  logs
 		println("connection: formed = ${info.groupFormed}, isOwner = ${info.isGroupOwner}")
-		if (!isConnected && info.groupFormed) {
+		if (!isConnected && info.groupFormed && info.groupOwnerAddress != null) {
 			Session.log("CONNECTED (${info.groupOwnerAddress.hostAddress})")
 			isGroupFormed = true
 		}
 		if (isConnected && !info.groupFormed) Session.log("DISCONNECTED")
 		
 		//  sockets
-		createFormationSocket()
+		tryCreateFormationSocket()
 		
 		//  client formation        needs group formed, else ex
-		if (Session.isClient && this.mySocketFormation == null && ClientData.get == null && info.groupFormed && info.groupOwnerAddress.hostAddress != null) {
+		if (!isFinished && Session.isClient && ClientData.get == null && this.mySocketFormation == null && info.groupFormed && info.groupOwnerAddress.hostAddress != null) {
 			mySocketFormation = MyClientThread(info.groupOwnerAddress.hostAddress!!, MainActivity.PORT_FORMATION).apply {
 				addOnJson { jo, tag ->
 					if (tag != JSON_TAG_CONFIG) return@addOnJson
@@ -140,9 +146,12 @@ class MyWifiP2p(private val activity: MainActivity) {
 		}
 		
 		isConnected = info.groupFormed
+
+		if(!isFinished)
+			return
 		
 		//  host reconnection
-		if(isFinished && HostData.get != null)
+		if(HostData.get != null)
 			manager.requestPeers(channel) { list ->
 				HostData.get!!.clients.forEachIndexed { i, cl ->
 					val now = list.deviceList.filter { it.deviceName == cl.name }
@@ -166,37 +175,25 @@ class MyWifiP2p(private val activity: MainActivity) {
 					isWantDiscoverPeers = true
 				}
 			}
-		
-		//  client reconnect socket
-		if (isHasClientReconnected) {
-			ClientData.get!!.replaceSocket()
-			isHasClientReconnected = false
-		}
-		
+
 		//  client reconnect
-		if (!isConnected && ClientData.get != null && !isHasClientReconnected) {
-			var tryReconnect: () -> Unit = { }
-			tryReconnect = {
-				if (!isConnected) {
-					val config = WifiP2pConfig().apply {
-						deviceAddress = ClientData.get!!.hostMac
-						wps.setup = WpsInfo.PBC
-					}
-					manager.discoverPeers(channel, MyWifiP2pActionListener("discoverPeers"))
-					manager.connect(channel, config, MyWifiP2pActionListener("connect").setOnSuccess {
-						Session.log("try reconnect: success")
-						isHasClientReconnected = true
-					}.setOnFailure {
-						Session.log("try reconnect: fail")
-						thread {
-							Thread.sleep(10_000)
-							tryReconnect()
-						}
-					})
-				}
+		if (!isConnected && ClientData.get != null && wantNewClientReconnectionTry) {
+			wantNewClientReconnectionTry = false
+
+			val config = WifiP2pConfig().apply {
+				deviceAddress = ClientData.get!!.hostMac
+				wps.setup = WpsInfo.PBC
 			}
-			
-			tryReconnect()
+			manager.discoverPeers(channel, MyWifiP2pActionListener("discoverPeers"))
+			manager.connect(channel, config, MyWifiP2pActionListener("connect").setOnSuccess {
+				ClientData.get!!.replaceSocket()
+			}.setOnFailure {
+				Session.log("try reconnect: fail")
+				thread {
+					Thread.sleep(10_000)
+					wantNewClientReconnectionTry = true
+				}
+			})
 		}
 	}
 	
@@ -242,12 +239,14 @@ class MyWifiP2p(private val activity: MainActivity) {
 	
 	fun disconnectAll(onDisconnected:()->Unit={}) {
 		stopNSD()
-		manager.stopPeerDiscovery(channel, MyWifiP2pActionListener("stopPeerDiscovery").setOnComplete {
-			manager.cancelConnect(channel, MyWifiP2pActionListener("cancelConnect").setOnComplete {
-				manager.removeGroup(channel, MyWifiP2pActionListener("removeGroup").setOnComplete {
-					isWantConnection = true
-					Session.log("all connections reset")
-					onDisconnected()
+		manager.cancelConnect(channel, MyWifiP2pActionListener("stopPeerDiscovery").setOnComplete {
+			manager.stopPeerDiscovery(channel, MyWifiP2pActionListener("stopPeerDiscovery").setOnComplete {
+				manager.cancelConnect(channel, MyWifiP2pActionListener("cancelConnect").setOnComplete {
+					manager.removeGroup(channel, MyWifiP2pActionListener("removeGroup").setOnComplete {
+						isWantConnection = true
+						Session.log("all connections reset")
+						onDisconnected()
+					})
 				})
 			})
 		})
@@ -256,6 +255,7 @@ class MyWifiP2p(private val activity: MainActivity) {
 	fun stopNSD() {
 		manager.clearLocalServices(channel, MyWifiP2pActionListener("clearLocalServices"))
 		manager.clearServiceRequests(channel, MyWifiP2pActionListener("clearServiceRequests"))
+		isWantDiscoverServices = false;
 	}
 	
 	fun stopDiscovery() {
@@ -283,5 +283,5 @@ data class Client(
 	val ipWifiP2p:String,
 	val port:Int,
 	val name:String,
-	var isConnected:Boolean = false
+	var isConnected:Boolean = true
 )

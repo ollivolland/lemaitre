@@ -5,7 +5,8 @@ import java.io.OutputStream
 import java.net.InetSocketAddress
 import java.net.ServerSocket
 import java.net.Socket
-import java.util.concurrent.*
+import java.util.concurrent.ExecutorService
+import java.util.concurrent.Executors
 import kotlin.concurrent.thread
 
 abstract class MySocket(val port: Int, private val type:String) {
@@ -47,7 +48,7 @@ abstract class MySocket(val port: Int, private val type:String) {
                     } catch (_:Exception) { }
                 }
             } catch (e:Exception) {
-                Log.e("SCOKET", "exception")
+                Log.e("SOCKET", "exception ${e.printStackTrace()}")
                 isWantOpen = false
             }
         }
@@ -130,8 +131,10 @@ class MyClientThread(private val inetAddress: String, port: Int): MySocket(port,
         socket = Socket()
         
         thread {
-            socket.connect(InetSocketAddress(inetAddress, port), 3000)
-    
+            try {
+                socket.connect(InetSocketAddress(inetAddress, port), 3000)
+            } catch (e: Exception) {}
+
             setSocketConfigured()
 
             close()

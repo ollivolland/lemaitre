@@ -43,7 +43,10 @@ class MainActivity : Activity() {
     //  todo    home disable buttons on error
     //  todo    camera & gate orientation
     //  todo    display storage space
-    
+
+    //  todo    hard logs
+    //  todo    register nsd with client instead of host
+
     //  big
     //  todo    audioTrack instead of MediaPlayer   https://stackoverflow.com/questions/12263671/audiotrack-android-playing-sounds-from-raw-folder
 
@@ -95,7 +98,6 @@ class MainActivity : Activity() {
         vHost.setOnClickListener {
             myWifiP2p.disconnectAll {
                 Session.setState(Session.State.HOST)
-                myWifiP2p.stopNSD()
                 myWifiP2p.registerNSD()
             }
 

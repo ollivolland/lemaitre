@@ -20,7 +20,7 @@ class Session {
         
         fun setState(state: State) {
             synchronized(mState) {
-                if(mState != State.NONE) throw Exception()
+//                if(mState != State.NONE) throw Exception()
                 
                 mState = state
                 isHost = state == State.HOST

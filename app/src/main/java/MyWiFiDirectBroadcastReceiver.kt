@@ -3,6 +3,7 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import android.net.NetworkInfo
 import android.net.wifi.p2p.WifiP2pDevice
 import android.net.wifi.p2p.WifiP2pManager
 import com.ollivolland.lemaitre.MainActivity
@@ -16,18 +17,25 @@ class MyWiFiDirectBroadcastReceiver(
 ) : BroadcastReceiver() {
 	@SuppressLint("MissingPermission")
 	override fun onReceive(context: Context, intent: Intent) {
+		val device = intent.getParcelableExtra(WifiP2pManager.EXTRA_WIFI_P2P_DEVICE) as WifiP2pDevice?
+		val isWifiP2pEnabled = intent.getIntExtra(WifiP2pManager.EXTRA_WIFI_STATE, -1) == WifiP2pManager.WIFI_P2P_STATE_ENABLED
+		val networkInfo: NetworkInfo? = intent.getParcelableExtra(WifiP2pManager.EXTRA_NETWORK_INFO) as NetworkInfo?
+
 		when (intent.action!!) {
+			WifiP2pManager.WIFI_P2P_STATE_CHANGED_ACTION -> {
+				Session.log("stateInfo = ${networkInfo?.state}")
+			}
 			WifiP2pManager.WIFI_P2P_THIS_DEVICE_CHANGED_ACTION -> {
 				println("WIFI_P2P_THIS_DEVICE_CHANGED_ACTION")
-				
-				val device = intent.getParcelableExtra(WifiP2pManager.EXTRA_WIFI_P2P_DEVICE) as WifiP2pDevice?
 				if(device != null && myWifiP2p.deviceName.isEmpty()) {
 					myWifiP2p.deviceName = device.deviceName
-					Session.log("deviceName = ${myWifiP2p.deviceName}")
+					Session.log("deviceName = ${myWifiP2p.deviceName}:${isWifiP2pEnabled}")
 				}
 			}
 			WifiP2pManager.WIFI_P2P_CONNECTION_CHANGED_ACTION  -> {
 				println("WIFI_P2P_CONNECTION_CHANGED_ACTION")
+
+				Session.log("networkInfo = ${networkInfo?.state}")
 				
 				// Respond to new connection or disconnections
 				manager.requestConnectionInfo(channel, myWifiP2p.mConnectionInfoListener)
@@ -35,7 +43,7 @@ class MyWiFiDirectBroadcastReceiver(
 			WifiP2pManager.WIFI_P2P_PEERS_CHANGED_ACTION       -> {
 				println("WIFI_P2P_PEERS_CHANGED_ACTION")
 				
-				if(!myWifiP2p.isFormed)
+				if(!myWifiP2p.isFinished)
 					manager.requestPeers(channel) { list ->
 						// Respond to new connection or disconnections
 						list.deviceList.forEach {
@@ -59,6 +67,7 @@ class MyWiFiDirectBroadcastReceiver(
 	
 	companion object {
 		private val INTENT_FILTER = IntentFilter().apply {
+			addAction(WifiP2pManager.WIFI_P2P_STATE_CHANGED_ACTION)
 			addAction(WifiP2pManager.WIFI_P2P_PEERS_CHANGED_ACTION)
 			addAction(WifiP2pManager.WIFI_P2P_CONNECTION_CHANGED_ACTION)
 			addAction(WifiP2pManager.WIFI_P2P_THIS_DEVICE_CHANGED_ACTION)

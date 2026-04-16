@@ -19,6 +19,7 @@ abstract class MySocket(val port: Int, private val type:String) {
     protected lateinit var socket: Socket
     private var isSocketConfigured = false
     var isWantOpen = true;protected set
+    private var isClosed = false
     
     init {
     	println("[$port] $type creating")
@@ -80,13 +81,6 @@ abstract class MySocket(val port: Int, private val type:String) {
         }
     }
     
-    protected fun finish() {
-        socket.close()
-        
-        println("[$port] $type closed")
-        for (x in myOnCloseListeners) x?.invoke()
-    }
-    
     protected fun setSocketConfigured() {
         if(isSocketConfigured) throw Exception()
         
@@ -102,8 +96,15 @@ abstract class MySocket(val port: Int, private val type:String) {
     }
 
     fun close() {
+        if(isClosed)
+            return
+
+        isClosed = true
         executor.execute { isInputOpen = false }
         isWantOpen = false
+
+        println("[$port] $type closed")
+        for (x in myOnCloseListeners) x?.invoke()
     }
 
     fun addOnConfigured(action:(Socket) -> Unit) {
@@ -133,7 +134,7 @@ class MyClientThread(private val inetAddress: String, port: Int): MySocket(port,
     
             setSocketConfigured()
 
-            finish()
+            close()
         }
     }
 }
@@ -148,7 +149,7 @@ class MyServerThread(port:Int): MySocket(port, "server") {
             setSocketConfigured()
 
             serverSocket.close()
-            finish()
+            close()
         }
     }
 }

@@ -13,7 +13,6 @@ import android.net.wifi.WifiManager
 import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
-import android.view.View
 import android.widget.Button
 import android.widget.TextView
 import android.widget.Toast
@@ -80,29 +79,31 @@ class MainActivity : Activity() {
 
         //  ui
         val vHost = findViewById<Button>(R.id.buttonHost)
-        val vClient = findViewById<Button>(R.id.buttonClient)
         vLogger = findViewById(R.id.logger)
         vFeedback = findViewById(R.id.main_tFeedback)
         
         //  wifi
         myWifiP2p = MyWifiP2p(this)
         myWifiP2p.disconnectAll {
-            vClient.isEnabled = true
             vHost.isEnabled = true
+            Session.setState(Session.State.CLIENT)
+            myWifiP2p.discoverNSD {
+                vHost.isEnabled = false
+            }
         }
 
         vHost.setOnClickListener {
-            Session.setState(Session.State.HOST)
-            myWifiP2p.startRegistration()
+            myWifiP2p.disconnectAll {
+                Session.setState(Session.State.HOST)
+                myWifiP2p.stopNSD()
+                myWifiP2p.registerNSD()
+            }
 
             vHost.setString("launch!")
-            vClient.isEnabled = false
             vHost.isEnabled = false
             vHost.setOnClickListener {
                 HostData.set(myWifiP2p.deviceName, myWifiP2p.clients)
-                myWifiP2p.isFormed = true
-                myWifiP2p.stopNSD()
-                myWifiP2p.stopDiscovery()
+                myWifiP2p.finish()
                 
                 Session.log("formed with ${myWifiP2p.clients.size} clients")
 
@@ -114,15 +115,6 @@ class MainActivity : Activity() {
                 while (!myWifiP2p.isGroupFormed) Thread.sleep(10)
                 runOnUiThread { vHost.isEnabled = true }
             }
-        }
-
-        vClient.setOnClickListener {
-            Session.setState(Session.State.CLIENT)
-            myWifiP2p.discover()
-
-            vHost.visibility = View.INVISIBLE
-            vHost.isEnabled=false
-            vClient.isEnabled=false
         }
 
         //  setup

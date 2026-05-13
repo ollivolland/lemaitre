@@ -21,7 +21,7 @@ import datas.Session
 import datas.StartData
 import org.json.JSONObject
 import setString
-import java.util.*
+import java.util.Calendar
 import kotlin.concurrent.thread
 
 
@@ -59,7 +59,7 @@ class ActivityHome : AppCompatActivity() {
         }
     
         MyWifiP2p.get?.stopDiscovery()
-        MyWifiP2p.get?.stopNSD()
+        MyWifiP2p.get?.myNSD?.stopNSD()
 
         //  *****   HOST
         if(Session.isHost) {
@@ -237,7 +237,7 @@ class ActivityHome : AppCompatActivity() {
     override fun onDestroy() {
         super.onDestroy()
         isRunning = false
-        MyWifiP2p.get?.close()
+//        MyWifiP2p.get?.close()
         
         for(x in socketReadListeners) x.first.removeOnJson(x.second)
     }

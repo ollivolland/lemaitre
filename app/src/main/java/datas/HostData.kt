@@ -34,19 +34,20 @@ class HostData private constructor(val hostName:String, val clients: Array<Clien
         for (x in mySockets)
             x.write(JSONObject(), JSON_TAG_LAUNCH)
     }
-    
-    fun replaceSocket(i:Int) {
-        try {
-            mySockets[i] = createSocket(i)
-        }
-        catch (e:Exception) {
-            Session.log("reconnection crashed")
-            thread {
-                Thread.sleep(4000)
-                replaceSocket(i)
-            }
-        }
-    }
+
+//    @Deprecated("obsolete")
+//    fun replaceSocket(i:Int) {
+//        try {
+//            mySockets[i] = createSocket(i)
+//        }
+//        catch (e:Exception) {
+//            Session.log("reconnection crashed")
+//            thread {
+//                Thread.sleep(4000)
+//                replaceSocket(i)
+//            }
+//        }
+//    }
     
     private fun createSocket(i:Int): MySocket {
         val socket = MyClientThread(clients[i].ipWifiP2p, clients[i].port)

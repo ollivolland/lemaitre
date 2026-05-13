@@ -1,271 +1,145 @@
 import android.annotation.SuppressLint
+import android.content.BroadcastReceiver
 import android.content.Context
+import android.content.Intent
+import android.content.IntentFilter
+import android.net.NetworkInfo
 import android.net.wifi.WpsInfo
 import android.net.wifi.p2p.WifiP2pConfig
 import android.net.wifi.p2p.WifiP2pDevice
-import android.net.wifi.p2p.WifiP2pInfo
 import android.net.wifi.p2p.WifiP2pManager
-import android.net.wifi.p2p.nsd.WifiP2pDnsSdServiceInfo
-import android.net.wifi.p2p.nsd.WifiP2pDnsSdServiceRequest
 import com.ollivolland.lemaitre.MainActivity
-import datas.ClientData
-import datas.HostData
+import com.ollivolland.lemaitre.MyNSD
 import datas.Session
-import org.json.JSONObject
 import kotlin.concurrent.thread
 
 
 @SuppressLint("MissingPermission")
-class MyWifiP2p(private val activity: MainActivity) {
-	private val manager: WifiP2pManager by lazy { activity.getSystemService(Context.WIFI_P2P_SERVICE) as WifiP2pManager }
-	private val channel: WifiP2pManager.Channel = manager.initialize(activity, activity.mainLooper, null)
-	private val receiver: MyWiFiDirectBroadcastReceiver = MyWiFiDirectBroadcastReceiver(manager, channel, activity, this)
-	val mConnectionInfoListener: WifiP2pManager.ConnectionInfoListener = WifiP2pManager.ConnectionInfoListener(this::onConnectionInfo)
-	val formationDevices = mutableListOf<WifiP2pDevice>()
-	val clients = mutableListOf<Client>()
-	private lateinit var hostMac:String
-	private var mySocketFormation: MySocket? = null
+class MyWifiP2p(private val activity: MainActivity, private val mConnectionInfoListener: WifiP2pManager.ConnectionInfoListener) {
+	val manager: WifiP2pManager by lazy { activity.getSystemService(Context.WIFI_P2P_SERVICE) as WifiP2pManager }
+	val channel: WifiP2pManager.Channel = manager.initialize(activity, activity.mainLooper, null)
+	var onPeersChangedAction:(()-> Unit)? = null
+	private val receiver: BroadcastReceiver = object : BroadcastReceiver() {
+		override fun onReceive(p0: Context?, intent: Intent) {
+			val device = intent.getParcelableExtra(WifiP2pManager.EXTRA_WIFI_P2P_DEVICE) as WifiP2pDevice?
+			val isWifiP2pEnabled = intent.getIntExtra(WifiP2pManager.EXTRA_WIFI_STATE, -1) == WifiP2pManager.WIFI_P2P_STATE_ENABLED
+			val networkInfo: NetworkInfo? = intent.getParcelableExtra(WifiP2pManager.EXTRA_NETWORK_INFO) as NetworkInfo?
+
+			when (intent.action!!) {
+				WifiP2pManager.WIFI_P2P_STATE_CHANGED_ACTION -> {
+				}
+				WifiP2pManager.WIFI_P2P_THIS_DEVICE_CHANGED_ACTION -> {
+					println("WIFI_P2P_THIS_DEVICE_CHANGED_ACTION")
+					if(device != null && deviceName.isEmpty()) {
+						deviceName = device.deviceName
+						Session.log("deviceName = ${deviceName}:${isWifiP2pEnabled}")
+					}
+
+					requestConnectionInfo()
+				}
+				WifiP2pManager.WIFI_P2P_CONNECTION_CHANGED_ACTION  -> {
+					println("WIFI_P2P_CONNECTION_CHANGED_ACTION")
+
+					Session.log("networkInfo = ${networkInfo?.state}")
+					if(networkInfo?.state == NetworkInfo.State.UNKNOWN) {
+//						AlertDialog.Builder(activity)
+//							.setTitle("Network bugged")
+//							.setMessage("restart?")
+//							.setPositiveButton(R.string.ok) { dialog, which -> {
+//								activity.finish()
+//								System.exit(0)
+//							} }
+//							.setIconAttribute(R.attr.alertDialogIcon)
+//							.show()
+						Session.log("RESTART THE APP; NETWORK IS BUGGED")
+//						manager.
+					}
+
+					// Respond to new connection or disconnections
+					requestConnectionInfo()
+				}
+				WifiP2pManager.WIFI_P2P_PEERS_CHANGED_ACTION       -> {
+					println("WIFI_P2P_PEERS_CHANGED_ACTION")
+
+					onPeersChangedAction?.invoke()
+					requestConnectionInfo()
+				}
+			}
+		}
+	}
+	val myNSD = MyNSD(this)
 	var deviceName: String = ""
-	private var isHasTriedConnectingToHost = false
-	private var isWantDiscoverPeers = false
-	private var isWantDiscoverServices = false
-	private var isWantConnection = false
-	private var isConnected = false
-	private var isFormationSocketReady = true
-	private var wantNewClientReconnectionTry = true
 	private var isOpen = true
-	var isFinished = false
-	var isGroupFormed:Boolean = false;private set
 	var lastConnectionInfo = 0L
-	
+
+
 	init {
 		if(get != null) {
 			get!!.close()
 		}
 		get = this
-		receiver.register()
+		activity.applicationContext.registerReceiver(receiver, INTENT_FILTER)
 		
 		//  vacuous thread
 		thread(name = "wifip2p vacuous thread") {
 			while (isOpen) {
-				if(isWantDiscoverPeers)
-					manager.discoverPeers(channel, MyWifiP2pActionListener("discoverPeers"))
-
-				if(isWantDiscoverServices)
+				if(myNSD.isWantDiscoverServices)
 					manager.discoverServices(channel, MyWifiP2pActionListener("discoverServices"))
 
-				if(lastConnectionInfo + 1000L < System.currentTimeMillis()) {
-					lastConnectionInfo = System.currentTimeMillis()
-					requestConnectionInfo()
-				}
+//				if(lastConnectionInfo + 1000L < System.currentTimeMillis()) {
+//					lastConnectionInfo = System.currentTimeMillis()
+//					requestConnectionInfo()
+//				}
 
-				Thread.sleep(100)
+				Thread.sleep(3000)
 			}
 		}
 		
 		requestConnectionInfo()
 	}
-	
+
+
 	fun requestConnectionInfo() {
 		manager.requestConnectionInfo(channel, mConnectionInfoListener)
 	}
-	
-	private fun tryCreateFormationSocket() {
-		if(isFinished) return
-		
-		if (Session.isHost && isFormationSocketReady) {
-			isFormationSocketReady = false
-			val port = MainActivity.PORT_COMMUNICATION + clients.count()
-			var ip = ""
-			
-			mySocketFormation = MyServerThread(MainActivity.PORT_FORMATION).apply {
-				addOnConfigured {
-					ip = it.inetAddress.hostAddress!!
-					
-					this.write(JSONObject().apply {
-						accumulate(JSON_KEY_PORT, port)
-					}, JSON_TAG_CONFIG)
-				}
-				addOnJson { jo, tag ->
-					if (tag != JSON_TAG_CLIENT_REPLY) return@addOnJson
-					
-					val client = Client(ip, port, jo[JSON_KEY_DEVICE_NAME] as String)   //, jo["address"] as String)
-					clients.add(client)
-					Session.log("client ${client.name} on [$port] => $ip")
-					
-					this.close()
-				}
-				addOnClose {
-					isFormationSocketReady = true
-					tryCreateFormationSocket()
-				}
-				log(Session.Companion::log)
-			}
+
+
+	fun connectDevice(device: WifiP2pDevice) {
+		val config = WifiP2pConfig().apply {
+			deviceAddress = device.deviceAddress
+			wps.setup = WpsInfo.PBC
 		}
+		manager.connect(channel, config, MyWifiP2pActionListener("connect"))
 	}
 
-	fun finish() {
-		isFinished = true
-		stopNSD()
-		stopDiscovery()
-		mySocketFormation?.close()
-		mySocketFormation = null
-	}
-	
-	private fun onConnectionInfo(info: WifiP2pInfo) {
-		if (!isWantConnection) return
-		
-		//  logs
-		println("connection: formed = ${info.groupFormed}, isOwner = ${info.isGroupOwner}")
-		if (!isConnected && info.groupFormed && info.groupOwnerAddress != null) {
-			Session.log("CONNECTED (${info.groupOwnerAddress.hostAddress})")
-			isGroupFormed = true
-		}
-		if (isConnected && !info.groupFormed) Session.log("DISCONNECTED")
-		
-		//  sockets
-		tryCreateFormationSocket()
-		
-		//  client formation        needs group formed, else ex
-		if (!isFinished && Session.isClient && ClientData.get == null && this.mySocketFormation == null && info.groupFormed && info.groupOwnerAddress.hostAddress != null) {
-			mySocketFormation = MyClientThread(info.groupOwnerAddress.hostAddress!!, MainActivity.PORT_FORMATION).apply {
-				addOnJson { jo, tag ->
-					if (tag != JSON_TAG_CONFIG) return@addOnJson
-					
-					this.write(JSONObject().apply {
-						accumulate(JSON_KEY_DEVICE_NAME, deviceName)
-					}, JSON_TAG_CLIENT_REPLY)
-					
-					ClientData.set(jo[JSON_KEY_PORT] as Int, hostMac, deviceName, activity)
-					Session.log("host = ${ClientData.get!!.port}")
 
-					this.close()
-				}
-				log(Session.Companion::log)
-			}
-		}
-		
-		isConnected = info.groupFormed
-
-		if(!isFinished)
-			return
-		
-		//  host reconnection
-		if(HostData.get != null)
-			manager.requestPeers(channel) { list ->
-				HostData.get!!.clients.forEachIndexed { i, cl ->
-					val now = list.deviceList.filter { it.deviceName == cl.name }
-					val isConnecting = now.size == 1 && now[0].status == WifiP2pDevice.CONNECTED
-					
-					if (!cl.isConnected && isConnecting) {
-						Session.log("reconnect ${cl.name}")
-						HostData.get!!.replaceSocket(i)
-					}
-					
-					cl.isConnected = isConnecting
-				}
-				
-				//  discovery
-				if(isWantDiscoverPeers && (HostData.get!!.clients.isEmpty() || HostData.get!!.clients.all { it.isConnected })) {
-					Session.log("PeerDiscovery stopped")
-					stopDiscovery()
-				}
-				if(!isWantDiscoverPeers && HostData.get!!.clients.isNotEmpty() && HostData.get!!.clients.any { !it.isConnected }) {
-					Session.log("PeerDiscovery restarted")
-					isWantDiscoverPeers = true
-				}
-			}
-
-		//  client reconnect
-		if (!isConnected && ClientData.get != null && wantNewClientReconnectionTry) {
-			wantNewClientReconnectionTry = false
-
-			val config = WifiP2pConfig().apply {
-				deviceAddress = ClientData.get!!.hostMac
-				wps.setup = WpsInfo.PBC
-			}
-			manager.discoverPeers(channel, MyWifiP2pActionListener("discoverPeers"))
-			manager.connect(channel, config, MyWifiP2pActionListener("connect").setOnSuccess {
-				ClientData.get!!.replaceSocket()
-			}.setOnFailure {
-				Session.log("try reconnect: fail")
-				thread {
-					Thread.sleep(10_000)
-					wantNewClientReconnectionTry = true
-				}
-			})
-		}
-	}
-	
-	@SuppressLint("MissingPermission")
-	fun discoverNSD(onConnected: () -> Unit) {
-		manager.setDnsSdResponseListeners(channel,
-			{ instanceName, registrationType, resourceType ->
-				Session.log("service: $instanceName\n\t$registrationType ${resourceType.deviceName} ${resourceType.deviceAddress}")
-				isWantDiscoverServices = false
-				stopNSD()
-				onConnected()
-				
-				//  connect from host
-				if(!isHasTriedConnectingToHost) {
-					isHasTriedConnectingToHost = true
-					
-					hostMac = resourceType.deviceAddress
-					val config = WifiP2pConfig().apply {
-						deviceAddress = hostMac
-						wps.setup = WpsInfo.PBC
-					}
-					manager.connect(channel, config, MyWifiP2pActionListener("connect"))
-				}
-			},
-			{ _, _, _ -> })
-		
-		manager.addServiceRequest(channel, WifiP2pDnsSdServiceRequest.newInstance(), MyWifiP2pActionListener("addServiceRequest").setOnSuccess {
-			isWantDiscoverServices = true
-		})
-	}
-	
-	@SuppressLint("MissingPermission")
-	fun registerNSD() {
-		val serviceInfo = WifiP2pDnsSdServiceInfo.newInstance(MainActivity.SERVICE_NAME, MainActivity.SERVICE_TYPE, mapOf())
-		
-		//  create service
-		manager.createGroup(channel, MyWifiP2pActionListener("createGroup").setOnSuccess {
-			manager.addLocalService(channel, serviceInfo, MyWifiP2pActionListener("addLocalService").setOnSuccess {
-				Session.log("NSD registered")
-			})
-		})
-	}
-	
 	fun disconnectAll(onDisconnected:()->Unit={}) {
-		stopNSD()
-		manager.cancelConnect(channel, MyWifiP2pActionListener("stopPeerDiscovery").setOnComplete {
+		manager.cancelConnect(channel, MyWifiP2pActionListener("cancelConnect").setOnComplete {
 			manager.stopPeerDiscovery(channel, MyWifiP2pActionListener("stopPeerDiscovery").setOnComplete {
-				manager.cancelConnect(channel, MyWifiP2pActionListener("cancelConnect").setOnComplete {
-					manager.removeGroup(channel, MyWifiP2pActionListener("removeGroup").setOnComplete {
-						isWantConnection = true
-						Session.log("all connections reset")
-						onDisconnected()
-					})
+				manager.removeGroup(channel, MyWifiP2pActionListener("removeGroup").setOnComplete {
+					Session.log("all connections reset")
+					onDisconnected()
 				})
 			})
 		})
 	}
-	
-	fun stopNSD() {
-		manager.clearLocalServices(channel, MyWifiP2pActionListener("clearLocalServices"))
-		manager.clearServiceRequests(channel, MyWifiP2pActionListener("clearServiceRequests"))
-		isWantDiscoverServices = false;
+
+
+	fun createGroup(onComplete:(()->Unit)? = null) {
+		//  create service
+		manager.createGroup(channel, MyWifiP2pActionListener("createGroup").setOnSuccess {
+			onComplete?.invoke()
+		})
 	}
-	
+
+
 	fun stopDiscovery() {
 		manager.stopPeerDiscovery(channel, MyWifiP2pActionListener("stopPeerDiscovery"))
-		isWantDiscoverPeers = false
 	}
-	
+
+
 	fun close() {
 		isOpen = false
-		receiver.unregister()
 		get = null
 	}
 	
@@ -276,6 +150,13 @@ class MyWifiP2p(private val activity: MainActivity) {
 		const val JSON_KEY_DEVICE_NAME = "name"
 		
 		var get:MyWifiP2p? = null
+
+		private val INTENT_FILTER = IntentFilter().apply {
+			addAction(WifiP2pManager.WIFI_P2P_STATE_CHANGED_ACTION)
+			addAction(WifiP2pManager.WIFI_P2P_PEERS_CHANGED_ACTION)
+			addAction(WifiP2pManager.WIFI_P2P_CONNECTION_CHANGED_ACTION)
+			addAction(WifiP2pManager.WIFI_P2P_THIS_DEVICE_CHANGED_ACTION)
+		}
 	}
 }
 

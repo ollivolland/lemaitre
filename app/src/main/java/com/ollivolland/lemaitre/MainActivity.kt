@@ -1,7 +1,6 @@
 package com.ollivolland.lemaitre
 
 import GpsTime
-import MyWifiP2p
 import android.Manifest
 import android.app.Activity
 import android.content.Context
@@ -22,7 +21,6 @@ import com.google.android.gms.location.LocationServices
 import com.google.android.gms.location.LocationSettingsRequest
 import com.google.android.gms.location.SettingsClient
 import datas.ClientData
-import datas.HostData
 import datas.Session
 import setString
 import java.io.File
@@ -55,10 +53,11 @@ class MainActivity : Activity() {
     private val wifiManager: WifiManager by lazy { applicationContext.getSystemService(Context.WIFI_SERVICE) as WifiManager }
     private val locationManager: LocationManager by lazy { getSystemService(Context.LOCATION_SERVICE) as LocationManager }
     private var isRunning = true
-    private lateinit var myWifiP2p:MyWifiP2p
+    private lateinit var connectionManager: MyConnectionManager
     
     private lateinit var vLogger:TextView
     private lateinit var vFeedback:TextView
+    lateinit var vHost: Button
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -81,42 +80,34 @@ class MainActivity : Activity() {
             File("$dir\\$PATH_SENSITIVITY").writeText("1000")
 
         //  ui
-        val vHost = findViewById<Button>(R.id.buttonHost)
+        vHost = findViewById(R.id.buttonHost)
         vLogger = findViewById(R.id.logger)
         vFeedback = findViewById(R.id.main_tFeedback)
         
         //  wifi
-        myWifiP2p = MyWifiP2p(this)
-        myWifiP2p.disconnectAll {
+        connectionManager = MyConnectionManager(this)
+        connectionManager.onInit = {
             vHost.isEnabled = true
-            Session.setState(Session.State.CLIENT)
-            myWifiP2p.discoverNSD {
-                vHost.isEnabled = false
-            }
         }
+        connectionManager.init()
+
 
         vHost.setOnClickListener {
-            myWifiP2p.disconnectAll {
-                Session.setState(Session.State.HOST)
-                myWifiP2p.registerNSD()
-            }
+            connectionManager.setAsHost()
 
             vHost.setString("launch!")
-            vHost.isEnabled = false
+//            vHost.isEnabled = false
             vHost.setOnClickListener {
-                HostData.set(myWifiP2p.deviceName, myWifiP2p.clients)
-                myWifiP2p.finish()
-                
-                Session.log("formed with ${myWifiP2p.clients.size} clients")
+                connectionManager.launchHost()
 
                 startActivity(Intent(this, ActivityHome::class.java))
                 finish()
             }
 
-            thread {
-                while (!myWifiP2p.isGroupFormed) Thread.sleep(10)
-                runOnUiThread { vHost.isEnabled = true }
-            }
+//            thread {
+//                while (!myWifiP2p.isGroupFormed) Thread.sleep(10)
+//                runOnUiThread { vHost.isEnabled = true }
+//            }
         }
 
         //  setup
@@ -144,8 +135,8 @@ class MainActivity : Activity() {
                     vLogger.text = Session.getLogs().takeLast(20).reversed().joinToString("\n")
                     vFeedback.text = when {
                         Session.isHost -> {
-                            if(myWifiP2p.clients.size == 0) "no clients"
-                            else myWifiP2p.clients.joinToString("\n") { it.name }
+                            if(connectionManager.clients.isEmpty()) "no clients"
+                            else connectionManager.clients.joinToString("\n") { it.name }
                         }
                         Session.isClient -> if(ClientData.get == null) "waiting for host" else "CONNECTED"
                         else -> "choose"
@@ -160,7 +151,6 @@ class MainActivity : Activity() {
     override fun onDestroy() {
         super.onDestroy()
         isRunning = false
-        myWifiP2p.stopNSD()
     }
 
     private fun buildAlertMessageNoGps() {
@@ -188,7 +178,7 @@ class MainActivity : Activity() {
         if(requestCode == 1000 || requestCode == 1001) {
             println("GPS activity result")
             GpsTime.register(MyApp.appContext)
-            myWifiP2p.requestConnectionInfo()
+            connectionManager.myWifiP2p.requestConnectionInfo()
         }
     }
 

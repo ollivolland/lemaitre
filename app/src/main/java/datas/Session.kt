@@ -28,8 +28,8 @@ class Session {
             }
         }
         
-        fun sendFeedback(mySocket: MySocket, string:String) {
-            mySocket.write(JSONObject().apply {
+        fun sendFeedback(mySocket: MySocket?, string:String) {
+            mySocket?.write(JSONObject().apply {
                 accumulate("msg", string)
             }, JSON_TAG_FEEDBACK)
         }

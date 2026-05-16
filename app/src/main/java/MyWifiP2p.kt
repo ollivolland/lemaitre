@@ -159,10 +159,3 @@ class MyWifiP2p(private val activity: MainActivity, private val mConnectionInfoL
 		}
 	}
 }
-
-data class Client(
-	val ipWifiP2p:String,
-	val port:Int,
-	val name:String,
-	var isConnected:Boolean = true
-)

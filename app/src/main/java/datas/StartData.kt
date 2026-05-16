@@ -9,9 +9,9 @@ data class StartData(val id:Long, val timeInit:Long, val timeInitToCommand: Long
     val config: ConfigData = Session.config
     val timeOfCommand = timeInit + timeInitToCommand
 
-    fun send(mySockets: Array<MySocket>) {
+    fun send(mySockets: Array<MySocket?>) {
         for (x in mySockets)
-            x.write(JSONObject().apply {
+            x?.write(JSONObject().apply {
                 accumulate("id", id)
                 accumulate("timeStamp", timeInit)
                 accumulate("commandLength", timeInitToCommand)

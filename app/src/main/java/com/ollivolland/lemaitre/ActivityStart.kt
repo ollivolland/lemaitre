@@ -28,7 +28,6 @@ import java.io.File
 import java.io.InputStream
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
-import java.util.*
 import kotlin.concurrent.thread
 import kotlin.math.abs
 import kotlin.math.min
@@ -301,7 +300,7 @@ class ActivityStart : AppCompatActivity() {
             isBusy = true
             this.startData = startData
             this.broadcastFeedback = activityHome::broadcastFeedback
-            this.showFeedback = activityHome::showFeedback
+            this.showFeedback = {it -> ActivityHome.showFeedback(it) }
 
             activityHome.startActivity(Intent(activityHome, ActivityStart::class.java))
         }

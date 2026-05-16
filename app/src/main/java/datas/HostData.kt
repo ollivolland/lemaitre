@@ -1,23 +1,25 @@
 package datas
 
-import Client
-import MyClientThread
+import MyServerThread
 import MySocket
 import MyTimer
 import android.app.Dialog
 import android.content.Context
 import android.widget.Spinner
 import android.widget.TextView
+import com.google.firebase.crashlytics.FirebaseCrashlytics
+import com.ollivolland.lemaitre.ActivityHome
 import com.ollivolland.lemaitre.R
 import config
+import datas.HostData.Companion.JSON_TAG_LAUNCH
+import datas.HostData.Companion.JSON_TAG_UPDATE
 import org.json.JSONObject
 import setString
+import java.net.InetSocketAddress
+import java.net.ServerSocket
 import kotlin.concurrent.thread
 
 class HostData private constructor(val hostName:String, val clients: Array<Client>) {
-    val mySockets:Array<MySocket> = Array(clients.size) { i -> createSocket(i) }
-    val lastUpdate:Array<Long> = Array(clients.size) { 0 }
-    val isHasGpsTime:Array<Boolean> = Array(clients.size) { false }
     private val configClients:Array<ConfigData>
     var command:String = COMMAND_CHOICES[0]
     var flavor:Long = FLAVOR_CHOICES[0]
@@ -25,62 +27,18 @@ class HostData private constructor(val hostName:String, val clients: Array<Clien
     var videoLength:Long = DURATION_CHOICES[0]
     var isInit = false
 
+
     init {
+
         //  set configs
         Session.config = ConfigData(hostName, true)
         configClients = Array(clients.size) { i -> ConfigData(clients[i].name) }
-        
-        //  launch home
-        for (x in mySockets)
-            x.write(JSONObject(), JSON_TAG_LAUNCH)
-    }
-
-//    @Deprecated("obsolete")
-//    fun replaceSocket(i:Int) {
-//        try {
-//            mySockets[i] = createSocket(i)
-//        }
-//        catch (e:Exception) {
-//            Session.log("reconnection crashed")
-//            thread {
-//                Thread.sleep(4000)
-//                replaceSocket(i)
-//            }
-//        }
-//    }
-    
-    private fun createSocket(i:Int): MySocket {
-        val socket = MyClientThread(clients[i].ipWifiP2p, clients[i].port)
-        socket.log(Session.Companion::log)
-        socket.addOnJson { jo, tag ->
-            println("socket[$i] received $tag")
-        
-            //  update
-            if (tag == JSON_TAG_UPDATE) {
-                synchronized(lastUpdate) { lastUpdate[i] = MyTimer.getTime() }
-//                synchronized(lastUpdate) { lastUpdate[i] = jo["time"].toString().toLong() }
-                synchronized(isHasGpsTime) { isHasGpsTime[i] = jo["isHasGps"].toString().toBoolean() }
-            }
-        }
-    
-        //  host update clients
-        thread(name = "socketHostDataSendUpdate") {
-            while (socket.isWantOpen) {
-                socket.write(JSONObject().apply {
-                    accumulate("time", MyTimer.getTime())
-                    accumulate("isHasGps", MyTimer.isHasGpsTime())
-                }, JSON_TAG_UPDATE)
-            
-                Thread.sleep(1000)
-            }
-        }
-        return socket
     }
     
     fun setClientConfig(i:Int, config: ConfigData) {
         synchronized(configClients) {
             configClients[i] = config
-            configClients[i].send(mySockets[i])
+            configClients[i].send(clients[i].socket)
         }
     }
     
@@ -133,6 +91,64 @@ class HostData private constructor(val hostName:String, val clients: Array<Clien
             if(ClientData.get != null) throw Exception()
             
             get = HostData(hostName, clients.toTypedArray())
+        }
+
+        lateinit var formationSocket: ServerSocket
+    }
+}
+
+
+class Client(
+    val ipWifiP2p:String,
+    val port:Int,
+    val name:String,
+    var isConnected:Boolean = true,
+    var socket: MySocket? = null) {
+    var lastUpdate: Long = 0
+    var isHasGpsTime = false
+
+    fun create() {
+        val serverSocket = ServerSocket()
+        serverSocket.reuseAddress = true
+        serverSocket.bind(InetSocketAddress(port))
+        thread {
+            while (true) {
+                Session.log("[$port] waiting")
+                socket?.socket?.close()
+                socket?.close()
+                try {
+                    socket = MyServerThread(serverSocket.accept(), port)
+                    socket!!.addOnJson{ jo, tag ->
+                        //  update
+                        if (tag == JSON_TAG_UPDATE) {
+                            lastUpdate = MyTimer.getTime()
+//                            synchronized(lastUpdate) { lastUpdate[i] = jo["time"].toString().toLong() }
+                            isHasGpsTime = jo["isHasGps"].toString().toBoolean()
+                        }
+                        Session.tryReceiveFeedback(jo, tag, ActivityHome::showFeedback)
+                    }
+                    socket!!.write(JSONObject(), JSON_TAG_LAUNCH)
+                    Session.log("accepted")
+                    socket!!.setSocketConfigured()
+                } catch (e: Exception) {
+                    Session.log("reconnection crashed")
+                    println(e.printStackTrace())
+                    FirebaseCrashlytics.getInstance().recordException(e)
+                }
+            }
+        }
+
+
+        //host update clients
+        thread(name = "socketHostDataSendUpdate") {
+            while (true) {
+                socket?.write(JSONObject().apply {
+                    accumulate("time", MyTimer.getTime())
+                    accumulate("isHasGps", MyTimer.isHasGpsTime())
+                }, JSON_TAG_UPDATE)
+
+                Thread.sleep(1000)
+            }
         }
     }
 }

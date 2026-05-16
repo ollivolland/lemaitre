@@ -1,15 +1,14 @@
 import android.util.Log
+import datas.HostData.Companion.JSON_TAG_UPDATE
+import datas.Session
 import org.json.JSONObject
 import java.io.InputStream
 import java.io.OutputStream
-import java.net.InetSocketAddress
-import java.net.ServerSocket
 import java.net.Socket
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
-import kotlin.concurrent.thread
 
-abstract class MySocket(val port: Int, private val type:String) {
+abstract class MySocket(val socket: Socket, val port: Int, private val type:String) {
     private val executor: ExecutorService = Executors.newSingleThreadExecutor()
     private val myOnSocketListener = mutableListOf<((Socket) -> Unit)?>()
     private val myOnCloseListeners = mutableListOf<(() -> Unit)?>()
@@ -17,15 +16,16 @@ abstract class MySocket(val port: Int, private val type:String) {
     private lateinit var mOutputStream: OutputStream
     private lateinit var mInputStream: InputStream
     private var isInputOpen = true
-    protected lateinit var socket: Socket
     private var isSocketConfigured = false
     var isWantOpen = true;protected set
     private var isClosed = false
-    
+
+
     init {
-    	println("[$port] $type creating")
+        log("[$port] $type creating")
     }
-    
+
+
     private fun receiveFromInputStream() {
         val buffer = ByteArray(1024)
         var length:Int
@@ -41,6 +41,8 @@ abstract class MySocket(val port: Int, private val type:String) {
                     try {
                         val jo = JSONObject(String(buffer, 0, length))
                         val tag = jo["tag"].toString()
+                        if(tag != JSON_TAG_UPDATE)
+                            Session.log("[$port] received JSON $tag")
             
                         for (x in myOnJSONListeners)
                             try { x?.invoke(jo, tag) }
@@ -48,7 +50,7 @@ abstract class MySocket(val port: Int, private val type:String) {
                     } catch (_:Exception) { }
                 }
             } catch (e:Exception) {
-                Log.e("SOCKET", "exception ${e.printStackTrace()}")
+                Log.e("SOCKET", "exception ${e.stackTrace}")
                 isWantOpen = false
             }
         }
@@ -57,15 +59,16 @@ abstract class MySocket(val port: Int, private val type:String) {
         while (isInputOpen) Thread.sleep(1)
     }
 
-    fun log(f:(String)->Unit) {
-        f("[$port] $type creating")
-        myOnSocketListener.add { socket -> f("[$port] $type created ${socket.localAddress.hostAddress} => ${socket.inetAddress.hostAddress}") }
-        myOnCloseListeners.add { f("[$port] $type closed") }
+
+    fun write(jo:JSONObject, tag:String) {
+        if(tag != JSON_TAG_UPDATE)
+            Session.log("[$port] sent JSON $tag")
+        write(jo.apply {
+            accumulate("tag", tag)
+        }.toString().encodeToByteArray())
     }
 
-    fun write(jo:JSONObject, tag:String) = write(jo.apply {
-        accumulate("tag", tag)
-    }.toString().encodeToByteArray())
+
     private fun write(byteArray: ByteArray) {
         if(!isWantOpen) return
         if(!this::mOutputStream.isInitialized) {
@@ -77,19 +80,18 @@ abstract class MySocket(val port: Int, private val type:String) {
             try {
                 mOutputStream.write(byteArray)
             } catch (_:Exception) {
-                isWantOpen = false
             }
         }
     }
     
-    protected fun setSocketConfigured() {
+    fun setSocketConfigured() {
         if(isSocketConfigured) throw Exception()
         
         isSocketConfigured = true
         mInputStream = socket.getInputStream()
         mOutputStream = socket.getOutputStream()
-        
-        println("[$port] $type created ${socket.localAddress.hostAddress} => ${socket.inetAddress.hostAddress}")
+
+        log("[$port] $type created ${socket.localAddress.hostAddress} => ${socket.inetAddress.hostAddress}")
         for (x in myOnSocketListener) x?.invoke(socket)
         
         //  now read
@@ -104,7 +106,7 @@ abstract class MySocket(val port: Int, private val type:String) {
         executor.execute { isInputOpen = false }
         isWantOpen = false
 
-        println("[$port] $type closed")
+        log("[$port] $type closed")
         for (x in myOnCloseListeners) x?.invoke()
     }
 
@@ -124,35 +126,18 @@ abstract class MySocket(val port: Int, private val type:String) {
         return myOnJSONListeners.lastIndex
     }
     fun removeOnJson(index:Int) { myOnJSONListeners[index] = null }
-}
 
-class MyClientThread(private val inetAddress: String, port: Int): MySocket(port, "client") {
-    init {
-        socket = Socket()
-        
-        thread {
-            try {
-                socket.connect(InetSocketAddress(inetAddress, port), 3000)
-            } catch (e: Exception) {}
-
-            setSocketConfigured()
-
-            close()
-        }
+    companion object {
+        val log:((String)->Unit) = { it -> Session.log(it) }
     }
 }
 
-class MyServerThread(port:Int): MySocket(port, "server") {
-    private var serverSocket: ServerSocket = ServerSocket(port)
-
+class MyClientThread(socket: Socket, private val inetAddress: String, port: Int): MySocket(socket, port, "client") {
     init {
-        thread {
-            socket  = serverSocket.accept()
-    
-            setSocketConfigured()
+    }
+}
 
-            serverSocket.close()
-            close()
-        }
+class MyServerThread(serverSocket: Socket, port:Int): MySocket(serverSocket, port, "server") {
+    init {
     }
 }

@@ -81,8 +81,8 @@ class ConfigData(val deviceName:String, private val isHost:Boolean = false) {
         }
     }
 
-    fun send(mySocket: MySocket) {
-        mySocket.write(JSONObject().apply {
+    fun send(mySocket: MySocket?) {
+        mySocket?.write(JSONObject().apply {
             accumulate("isCommand", isCommand)
             accumulate("isCamera", isCamera)
             accumulate("isGate", isGate)

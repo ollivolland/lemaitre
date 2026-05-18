@@ -15,6 +15,11 @@ class MyYubToRgb {
         fun yuvtorgb(image: Image, bitmap: Bitmap, context:Context) {
             val yuvBytes: ByteBuffer = imageToByteBuffer(image)
 
+            yuvtorgb(yuvBytes, bitmap, context)
+        }
+
+
+        fun yuvtorgb(yuvBytes: ByteBuffer, bitmap: Bitmap, context:Context) {
             // Convert YUV to RGB
             val rs = RenderScript.create(context)
             val allocationRgb = Allocation.createFromBitmap(rs, bitmap)
@@ -33,6 +38,7 @@ class MyYubToRgb {
             allocationRgb.destroy()
             rs.destroy()
         }
+
 
         fun imageToByteBuffer(image: Image): ByteBuffer {
             val crop = image.cropRect

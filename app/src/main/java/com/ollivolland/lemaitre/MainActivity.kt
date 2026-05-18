@@ -2,6 +2,7 @@ package com.ollivolland.lemaitre
 
 import GpsTime
 import android.Manifest
+import android.annotation.SuppressLint
 import android.app.Activity
 import android.content.Context
 import android.content.Intent
@@ -59,6 +60,7 @@ class MainActivity : Activity() {
     private lateinit var vFeedback:TextView
     lateinit var vHost: Button
 
+    @SuppressLint("UnsafeOptInUsageError")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
@@ -96,18 +98,12 @@ class MainActivity : Activity() {
             connectionManager.setAsHost()
 
             vHost.setString("launch!")
-//            vHost.isEnabled = false
             vHost.setOnClickListener {
                 connectionManager.launchHost()
 
                 startActivity(Intent(this, ActivityHome::class.java))
                 finish()
             }
-
-//            thread {
-//                while (!myWifiP2p.isGroupFormed) Thread.sleep(10)
-//                runOnUiThread { vHost.isEnabled = true }
-//            }
         }
 
         //  setup
@@ -146,6 +142,9 @@ class MainActivity : Activity() {
                 Thread.sleep(20)
             }
         }
+
+        //  Todo
+//        Velocity.extract(this, Environment.getExternalStorageDirectory().absolutePath + "/Download/VID_test.mp4")
     }
 
     override fun onDestroy() {

@@ -39,6 +39,7 @@ class ActivityHome : AppCompatActivity() {
     private var isRunning = true
     private var isDialogsFinished = false
 
+
     @SuppressLint("MissingPermission")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -190,7 +191,7 @@ class ActivityHome : AppCompatActivity() {
                     {
                         hasLaunched.add(x.id)
                         ActivityStart.launch(this, x)
-                        showFeedback("[${Globals.FORMAT_TIME.format(x.timeInit)}] started\n")
+                        showFeedback()//"[${Globals.FORMAT_TIME.format(x.timeInit)}] started\n")
                         Session.log("do start $x")
                     }
 
@@ -232,6 +233,7 @@ class ActivityHome : AppCompatActivity() {
         }
     }
 
+
     override fun onDestroy() {
         super.onDestroy()
         isRunning = false
@@ -239,7 +241,8 @@ class ActivityHome : AppCompatActivity() {
         
         for(x in socketReadListeners) x.first.removeOnJson(x.second)
     }
-    
+
+
     private fun updateViewGlobal(data: HostData) {
         viewGlobal.vTitle.text = data.command
         viewGlobal.vDesc.setString("flavor:${data.flavor/1000}s length:${data.videoLength/1000}s Δ:+${data.delta/1000}s")
@@ -289,8 +292,15 @@ class ActivityHome : AppCompatActivity() {
         private val feedbacks:MutableList<String> = mutableListOf()
 
 
-        fun showFeedback(string: String) {
-            synchronized(feedbacks) { feedbacks.add(string) }
+        fun showFeedback() {
+            synchronized(feedbacks) {
+                feedbacks.clear()
+
+                for(x in Session.getStarts()) {
+                    feedbacks.add(x.feedback())
+                    feedbacks.add("\n\n")
+                }
+            }
         }
     }
 }

@@ -1,6 +1,7 @@
 package datas
 
 import MySocket
+import com.ollivolland.lemaitre.ActivityHome
 import org.json.JSONObject
 
 class Session {
@@ -17,7 +18,8 @@ class Session {
         
         var isHost:Boolean = false;private set
         var isClient:Boolean = false;private set
-        
+
+
         fun setState(state: State) {
             synchronized(mState) {
 //                if(mState != State.NONE) throw Exception()
@@ -27,22 +29,30 @@ class Session {
                 isClient = state == State.CLIENT
             }
         }
-        
+
+
         fun sendFeedback(mySocket: MySocket?, string:String) {
             mySocket?.write(JSONObject().apply {
                 accumulate("msg", string)
             }, JSON_TAG_FEEDBACK)
         }
-        
-        fun tryReceiveFeedback(jo:JSONObject, tag:String, action:(String)->Unit) {
+
+
+        fun tryReceiveFeedback(jo:JSONObject, tag:String, action:()->Unit) {
             if(tag != JSON_TAG_FEEDBACK) return
             
-            action(jo["msg"].toString())
+            action() //jo["msg"].toString())
         }
-        
-        fun addStart(data: StartData) { synchronized(mStarts) { mStarts.add(data) } }
+
+
+        fun addStart(data: StartData) { synchronized(mStarts) {
+            mStarts.add(data)
+            data.save()
+            ActivityHome.showFeedback()
+        } }
         fun getStarts():Array<StartData> { synchronized(mStarts) { return mStarts.toTypedArray() } }
-        
+
+
         fun log(string: String) {
             println(string)
             synchronized(mLogs) { mLogs.add(string) }

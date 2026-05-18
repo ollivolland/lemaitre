@@ -19,12 +19,11 @@ import android.view.WindowManager
 import android.widget.ImageButton
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
+import datas.HostData
 import datas.Session
 import datas.StartData
-import format
 import mycamera2.MyCamera2
 import mycamera2.MyRecorder
-import java.io.File
 import java.io.InputStream
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
@@ -97,38 +96,38 @@ class ActivityStart : AppCompatActivity() {
         }
         
         //  Gate
-        if(start.config.isGate) {
-            val sens = File("${getExternalFilesDir(null)}\\${MainActivity.PATH_SENSITIVITY}").readText().toInt()
-            runOnUiThread { vLog.text = "${vLog.text}\nsens = $sens" }
-            analyzer = Analyzer(this, myCamera2, timer, start.timeOfCommand, sens)
-            analyzer.onStreakStartedListeners.add {
-                val msg = "gate: ${(it * .001).format(2)}s"
-                runOnUiThread { vLog.text = "${vLog.text}\n$msg" }
-                
-                if(isGateMpReady) {
-                    isGateMpReady = false
-                    gateMp.start()
-                }
-            }
-            analyzer.onTriangulatedListeners.add { triangleMs, frameMs, deltas ->
-                val gate = if(triangleMs == 0L) "${(frameMs * .001).format(2)}s?" else "${(triangleMs * .001).format(2)}s"
-                val msg = "gate: $gate   (${(frameMs * .001).format(2)}Δ${if(deltas<0) "-" else "+"}${abs(deltas).format(1)})"
-                
-                showFeedback?.invoke(msg)
-                broadcastFeedback?.invoke(msg)
-            }
-            
-            vGateLine.visibility = View.VISIBLE
-            isGateStarted = false
-            isGateStopped = false
-    
-            gateMp = MediaPlayer.create(this, R.raw.beep_middle_5db)
-            gateMp.setOnCompletionListener {
-                gateMp.pause()
-                gateMp.seekTo(0)
-                isGateMpReady = true
-            }
-        }
+//        if(start.config.isGate) {
+//            val sens = File("${getExternalFilesDir(null)}\\${MainActivity.PATH_SENSITIVITY}").readText().toInt()
+//            runOnUiThread { vLog.text = "${vLog.text}\nsens = $sens" }
+//            analyzer = Analyzer(this, myCamera2, timer, start.timeOfCommand, sens)
+//            analyzer.onStreakStartedListeners.add {
+//                val msg = "gate: ${(it * .001).format(2)}s"
+//                runOnUiThread { vLog.text = "${vLog.text}\n$msg" }
+//
+//                if(isGateMpReady) {
+//                    isGateMpReady = false
+//                    gateMp.start()
+//                }
+//            }
+//            analyzer.onTriangulatedListeners.add { triangleMs, frameMs, deltas ->
+//                val gate = if(triangleMs == 0L) "${(frameMs * .001).format(2)}s?" else "${(triangleMs * .001).format(2)}s"
+//                val msg = "gate: $gate   (${(frameMs * .001).format(2)}Δ${if(deltas<0) "-" else "+"}${abs(deltas).format(1)})"
+//
+//                showFeedback?.invoke(msg)
+//                broadcastFeedback?.invoke(msg)
+//            }
+//
+//            vGateLine.visibility = View.VISIBLE
+//            isGateStarted = false
+//            isGateStopped = false
+//
+//            gateMp = MediaPlayer.create(this, R.raw.beep_middle_5db)
+//            gateMp.setOnCompletionListener {
+//                gateMp.pause()
+//                gateMp.seekTo(0)
+//                isGateMpReady = true
+//            }
+//        }
         
         //  camera
         if(start.config.isCamera || start.config.isGate) {
@@ -194,7 +193,10 @@ class ActivityStart : AppCompatActivity() {
                             if(!isHasFound && hundreds[i] >= threshold) {
                                 isHasFound = true
                                 println("FOUND level [${"%05d".format(time)} ms] = ${hundreds[i]}")
-                                showFeedback?.invoke("shot: ${(time * .001).format(2)}s")
+                                start.commandDelay = time
+                                start.save()
+                                start.sendInfo(HostData.get!!.clients.map { it.socket }.toTypedArray())
+                                ActivityHome.showFeedback()
                             }
                             else
                                 println("level [${"%05d".format(time)} ms] = ${hundreds[i]}")
@@ -291,8 +293,8 @@ class ActivityStart : AppCompatActivity() {
 
         var startData: StartData? = null;private set
         var broadcastFeedback:((String)->Unit)? = null;private set
-        var showFeedback:((String)->Unit)? = null;private set
         var isBusy = false;private set
+
 
         fun launch(activityHome: ActivityHome, startData: StartData) {
             if(isBusy) return
@@ -300,7 +302,6 @@ class ActivityStart : AppCompatActivity() {
             isBusy = true
             this.startData = startData
             this.broadcastFeedback = activityHome::broadcastFeedback
-            this.showFeedback = {it -> ActivityHome.showFeedback(it) }
 
             activityHome.startActivity(Intent(activityHome, ActivityStart::class.java))
         }
@@ -315,7 +316,8 @@ class ActivityStart : AppCompatActivity() {
                 music[i] = (sin(i * 2 * Math.PI / sampleRate * freq) * amplitude).toFloat()
             }
         }
-        
+
+
         private fun play(c:Context, id:Int, music:FloatArray, amplitude:Float = 1f, startAtSeconds:Double = 0.0, endAfterSeconds:Double = 999.0) {
             val sampleRate = 44100
             val inputStream: InputStream = c.resources.openRawResource(id)

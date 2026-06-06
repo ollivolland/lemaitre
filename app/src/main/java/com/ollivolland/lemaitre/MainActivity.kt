@@ -1,6 +1,8 @@
 package com.ollivolland.lemaitre
 
+import Globals
 import GpsTime
+import Velocity
 import android.Manifest
 import android.annotation.SuppressLint
 import android.app.Activity
@@ -144,7 +146,9 @@ class MainActivity : Activity() {
         }
 
         //  Todo
-//        Velocity.extract(this, Environment.getExternalStorageDirectory().absolutePath + "/Download/VID_test.mp4")
+//        thread {
+            Velocity.extract(this, Globals.dirDownload.absolutePath + "/VID_test.mp4")
+//        }
     }
 
     override fun onDestroy() {

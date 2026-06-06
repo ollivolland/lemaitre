@@ -62,7 +62,7 @@ class MyConnectionManager(private val activity: MainActivity) {
 
 
         myWifiP2p.onPeersChangedAction = {
-            Session.log("peerschanged")
+//            Session.log("peerschanged")
             myWifiP2p.manager.requestPeers(myWifiP2p.channel) { list ->
                 if(!isFinished) {
                     for(x in formationDevices - list.deviceList)

@@ -51,19 +51,15 @@ class MyYubToRgb {
             var channelOffset: Int
             var outputStride: Int
             for (planeIndex in 0..2) {
-                when (planeIndex) {
-                    0 -> {
-                        channelOffset = 0
-                        outputStride = 1
-                    }
-                    1 -> {
-                        channelOffset = width * height + 1
-                        outputStride = 2
-                    }
-                    else -> {
-                        channelOffset = width * height
-                        outputStride = 2
-                    }
+                //NV12 / NV21
+                channelOffset = when(planeIndex) {
+                    0 -> 0
+                    1 -> width * height + 1
+                    else -> width * height
+                }
+                outputStride = when(planeIndex) {
+                    0 -> 1
+                    else -> 2
                 }
                 val buffer = planes[planeIndex].buffer
                 val rowStride = planes[planeIndex].rowStride
@@ -93,5 +89,14 @@ class MyYubToRgb {
             return output
         }
 
+
+        fun swapUV(byteArr: ByteArray, size: Int) {
+            var swap: Byte
+            for (i in 0 until size / 4) {
+                swap = byteArr[size + i * 2]
+                byteArr[size + i * 2] = byteArr[size + i * 2 + 1]
+                byteArr[size + i * 2 + 1] = swap
+            }
+        }
     }
 }

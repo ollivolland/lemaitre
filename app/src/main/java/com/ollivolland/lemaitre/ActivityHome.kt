@@ -54,6 +54,9 @@ class ActivityHome : AppCompatActivity() {
         val vBlinker = findViewById<View>(R.id.home_vBlinker)
         val vConfig = findViewById<LinearLayout>(R.id.home_lConfig)
         val vButtons = findViewById<LinearLayout>(R.id.home_lButtons)
+
+        val vDisconnect = findViewById<Button>(R.id.home_disconnect)
+        vDisconnect.visibility = View.GONE
     
         vPreview.setOnClickListener {
             startActivity(Intent(this, ActivityPreview::class.java))
@@ -161,8 +164,6 @@ class ActivityHome : AppCompatActivity() {
             
             isDialogsFinished = true
 
-
-            val vDisconnect = findViewById<Button>(R.id.home_disconnect)
             vDisconnect.setOnClickListener {
                 Toast.makeText(this, "disconnect", Toast.LENGTH_SHORT).show()
                 MyWifiP2p.get!!.manager.removeGroup(MyWifiP2p.get!!.channel, MyWifiP2pActionListener("manualCancelConnect"))

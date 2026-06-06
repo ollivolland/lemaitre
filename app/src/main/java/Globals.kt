@@ -10,6 +10,7 @@ class Globals {
         lateinit var get:Globals
         const val DIR_NAME = "lemaitre"
         val dirExternal = File("${Environment.getExternalStorageDirectory().absolutePath}/Android/data/com.ollivolland.lemaitre")
+        val dirDownload = File("${Environment.getExternalStorageDirectory().absolutePath}/Download")
 
         fun init(context: Context) {
             get = Globals()

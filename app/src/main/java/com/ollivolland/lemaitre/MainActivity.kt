@@ -14,6 +14,7 @@ import android.location.LocationManager
 import android.net.wifi.WifiManager
 import android.os.Build
 import android.os.Bundle
+import android.os.StrictMode
 import android.provider.Settings
 import android.widget.Button
 import android.widget.TextView
@@ -66,6 +67,9 @@ class MainActivity : Activity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
+
+//        if(BuildConfig.DEBUG)
+            StrictMode.enableDefaults()
 
         //  permissions
         val permissions = mutableListOf(
@@ -147,7 +151,7 @@ class MainActivity : Activity() {
 
         //  Todo
 //        thread {
-            Velocity.extract(this, Globals.dirDownload.absolutePath + "/VID_test.mp4")
+            Velocity.extract(this, Globals.dirDownload.absolutePath + "/velocity-test.mp4")
 //        }
     }
 

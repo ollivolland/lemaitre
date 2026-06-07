@@ -7,12 +7,12 @@ import android.media.MediaCodecList
 import android.media.MediaExtractor
 import android.media.MediaFormat
 import android.os.Environment
+import android.os.SystemClock
 import datas.Session
 import mycamera2.MyYubToRgb
 import java.io.File
 import java.io.FileOutputStream
 import java.nio.ByteBuffer
-import java.nio.IntBuffer
 
 
 class Velocity {
@@ -32,7 +32,7 @@ class Velocity {
             val videoTrackIndex: Int = ii[0]
             var format: MediaFormat? = null
             var mime: String? = null
-            for (i in 0..extractor.trackCount-1) {
+            for (i in 0 until extractor.trackCount) {
                 format = extractor.getTrackFormat(i)
                 mime = format.getString(MediaFormat.KEY_MIME)
 //                    Log.d(TAG, "track " + i + " : key_mime = " + mime)
@@ -52,179 +52,115 @@ class Velocity {
 
             format!!.setInteger(MediaFormat.KEY_COLOR_FORMAT, MediaCodecInfo.CodecCapabilities.COLOR_FormatYUV420SemiPlanar)  //  -> image
             codec!!.configure(format, null, null, 0)
-            val z = codec.getCodecInfo().getCapabilitiesForType(mime).colorFormats
-            Session.log("colorformats: " + z.joinToString())
+            Session.log("colorformats: " + codec.codecInfo.getCapabilitiesForType(mime).colorFormats.joinToString())
 
-            val width = format!!.getInteger(MediaFormat.KEY_WIDTH)
-            val height = format!!.getInteger(MediaFormat.KEY_HEIGHT)
+            val width = format.getInteger(MediaFormat.KEY_WIDTH)
+            val height = format.getInteger(MediaFormat.KEY_HEIGHT)
             val size = width*height
             val sizeYUV = size * 3 / 2
 
             val bmp = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
-            val buffer = IntBuffer.allocate(bmp.byteCount)
-            val bufferYUV = ByteBuffer.allocate(size * 3 / 2)
-            val longarr = Array<Long>(size*3) { 0 }
-            val intarr = IntArray(size)
-            val byteArr = ByteArray(size*3/2)
+            val arrayFrameCopy = ByteArray(sizeYUV)
+            val summationArray = Array<Long>(sizeYUV) { 0 }
             var frameCount = 0
+            var frameBuff: ByteBuffer
+            val timeStart = SystemClock.elapsedRealtime()
+            val times = mutableListOf<Long>()
+            val END = 20
 
-//            MediaCodec codec = MediaCodec.createByCodecName(name)
-            extractor.seekTo(0, MediaExtractor.SEEK_TO_PREVIOUS_SYNC)
-            codec.start()
-            val bufferInfo = MediaCodec.BufferInfo()
 
-            while (true) {
-                val inputBufferId = codec.dequeueInputBuffer(1_000_000)
-                if (inputBufferId >= 0) {
-                    val inputBuffer = codec.getInputBuffer(inputBufferId) ?: break
-                    val sampleSize = extractor.readSampleData(inputBuffer, 0)
-                    val presentationTimeUs = extractor.sampleTime
-                    val flags = extractor.sampleFlags
+            fun onFinish() {
+                val timeEnd = SystemClock.elapsedRealtime()
+                Session.log("process took ${timeEnd-timeStart}")
+                codec.stop()
+                codec.release()
 
-                    if(frameCount == 10) {
-                        codec.queueInputBuffer(
-                            inputBufferId,
-                            0,
-                            0,
-                            0,
-                            MediaCodec.BUFFER_FLAG_END_OF_STREAM
-                        )
-                        break
+                // TODO rewrite into functions, test sync / async
+                // TODO fix image topline issues
+
+                Session.log("processing end")
+                val arrayYUV = ByteArray(sizeYUV)
+                for (i in 0 until sizeYUV)
+                    arrayYUV[i] = (summationArray[i] / frameCount).toByte()
+                for (i in 0 until size)
+                    arrayYUV[i] = 127.toByte()
+                MyYubToRgb.swapUV(arrayYUV, size)
+                MyYubToRgb.yuvtorgb(arrayYUV, bmp, context)
+                File(Environment.getExternalStorageDirectory().absolutePath + "/Download/bmp.png").createNewFile()
+                FileOutputStream(Environment.getExternalStorageDirectory().absolutePath + "/Download/bmp.png")
+                    .use { out -> bmp.compress(Bitmap.CompressFormat.PNG,100, out) }
+            }
+            fun onInputBuffer(i:Int): Boolean {
+                if (i <= 0) return true
+                val inputBuffer = codec.getInputBuffer(i) ?: return false
+                val sampleSize = extractor.readSampleData(inputBuffer, 0)
+                val presentationTimeUs = extractor.sampleTime
+                times.add(presentationTimeUs)
+                val flags = extractor.sampleFlags
+
+                if(frameCount == END) {
+                    codec.queueInputBuffer(i, 0, 0, 0, MediaCodec.BUFFER_FLAG_END_OF_STREAM)
+//                    onFinish()    //  disable in snyc mode
+                    return false
+                }
+
+                codec.queueInputBuffer(i, 0, sampleSize, presentationTimeUs, flags)
+                extractor.advance()
+                return true
+            }
+            fun onOutputBuffer(i:Int) {
+                if (i <= 0 || frameCount >= END) return
+
+                // process
+                Session.log("processing $frameCount")
+
+                frameCount++
+                frameBuff = codec.getOutputBuffer(i)!!
+                frameBuff.rewind()
+                synchronized(arrayFrameCopy) {
+                    frameBuff.get(arrayFrameCopy)
+                    synchronized(summationArray) {
+                        for (i in 0 until sizeYUV)
+                            summationArray[i] = summationArray[i] + arrayFrameCopy[i].toLong()
                     }
-                    else
-                        // fill inputBuffers[inputBufferId] with valid data
-                        codec.queueInputBuffer(inputBufferId, 0, sampleSize, presentationTimeUs, flags)
                 }
 
-                val outputBufferId = codec.dequeueOutputBuffer(bufferInfo, 1_000_000)
-                if (outputBufferId >= 0 && frameCount <= 10) {
-                    // outputBuffers[outputBufferId] is ready to be processed or rendered.
-                    val frameBuff = codec.getOutputBuffer(outputBufferId)!!
+//                MyYubToRgb.swapUV(arrayFrameCopy, size)
+//                MyYubToRgb.yuvtorgb(arrayFrameCopy, bmp, context)
+//                File(Environment.getExternalStorageDirectory().absolutePath + "/Download/f$frameCount.png").createNewFile()
+//                FileOutputStream(Environment.getExternalStorageDirectory().absolutePath + "/Download/f$frameCount.png")
+//                    .use { out -> bmp.compress(Bitmap.CompressFormat.PNG,100, out) }
 
-                    // process
-                    Session.log("processing $frameCount")
-                    frameCount++
-
-                    frameBuff.rewind()
-                    for (i in 0 until sizeYUV)
-                        longarr[i] = longarr[i] + frameBuff.get()
-
-                    codec.releaseOutputBuffer(outputBufferId, false)
-                } else if (outputBufferId == MediaCodec.INFO_OUTPUT_FORMAT_CHANGED) {
-                    // Subsequent data will conform to new format.
-                    format = codec.outputFormat
-                }
+                codec.releaseOutputBuffer(i, false)
             }
-            codec.stop()
-            codec.release()
-
-            Session.log("processing end")
-            for (i in 0 until sizeYUV)
-                byteArr[i] = ((longarr[i] / frameCount).toByte())
-            MyYubToRgb.swapUV(byteArr, size)
-
-
-            bufferYUV.put(byteArr)
-            MyYubToRgb.yuvtorgb(bufferYUV, bmp, context)
-
-            File(Environment.getExternalStorageDirectory().absolutePath + "/Download/bmp.png").createNewFile()
-            FileOutputStream(Environment.getExternalStorageDirectory().absolutePath + "/Download/bmp.png").use { out ->
-                bmp.compress(
-                    Bitmap.CompressFormat.PNG,
-                    100,
-                    out
-                ) // bmp is your Bitmap instance
-            }
-            Session.log("WROTE")
-
 
 //            codec.setCallback(object : MediaCodec.Callback() {
-//                private var isInputDone = false
+//                override fun onInputBufferAvailable(p0: MediaCodec, i: Int) { onInputBuffer(i) }
 //
-//                override fun onInputBufferAvailable(p0: MediaCodec, index: Int) {
-//                    if (isInputDone) return
+//                override fun onOutputBufferAvailable(p0: MediaCodec, i: Int, p2: MediaCodec.BufferInfo) { onOutputBuffer(i) }
 //
-//                    val inputBuffer = codec.getInputBuffer(index) ?: return
-//                    val sampleSize = extractor.readSampleData(inputBuffer, 0)
+//                override fun onError(p0: MediaCodec, p1: MediaCodec.CodecException) = Unit
 //
-//                    val presentationTimeUs = extractor.sampleTime
-//                    val flags = extractor.sampleFlags
-////
-//                    Session.log("queueInputBuffer $index")
-//                    codec.queueInputBuffer(index, 0, sampleSize, presentationTimeUs, flags)
-//                    extractor.advance()
-//                }
-//
-//                override fun onOutputBufferAvailable(
-//                    p0: MediaCodec,
-//                    index: Int,
-//                    info: MediaCodec.BufferInfo
-//                ) {
-////                    if (isOutputDone) return
-////                    isOutputDone = true
-////                    isInputDone = true
-//
-//                    // 4. Convert the very first decoded buffer to a Bitmap
-//                    val image: Image? = codec.getOutputImage(index)
-//                    Session.log("onOutputBufferAvailable ${info.presentationTimeUs}")
-//                    MyYubToRgb.yuvtorgb(image!!, bmp, context)
-//                    buffer.position(0)
-//                    bmp.copyPixelsToBuffer(buffer)
-//
-//                    for (u in 0..2){
-//                        val offset = (2-u)*size
-//                        val shift = u*8
-//                        for (i in 0..size-1)
-//                            longarr[offset + i] = longarr[offset + i] + ((buffer[i] shr shift) and 0xff)
-//                    }
-//
-//                    frameCount++
-//
-//
-//                    if(frameCount == 100) {
-//                        isInputDone = true
-//
-//                        for (i in 0..size - 1)
-//                            intarr[i] = (0xff000000 or ((longarr[2 * size + i] / frameCount) shl 16) or ((longarr[1 * size + i] / frameCount) shl 8) or ((longarr[i] / frameCount) shl 0)).toInt()
-//
-//                        MyYubToRgb.yuvtorgb(image!!, bmp, context)
-//                        buffer.position(0) // rewind()
-//                        bmp.copyPixelsToBuffer(buffer)
-//                        bmp.setPixels(intarr, 0, width, 0, 0, width, height)
-//                        File(Environment.getExternalStorageDirectory().absolutePath + "/Download/bmp.png").createNewFile()
-//                        FileOutputStream(Environment.getExternalStorageDirectory().absolutePath + "/Download/bmp.png").use { out ->
-//                            bmp.compress(
-//                                Bitmap.CompressFormat.PNG,
-//                                100,
-//                                out
-//                            ) // bmp is your Bitmap instance
-//                        }
-//                        Session.log("WROTE")
-//                    }
-//
-//                    image!!.close()
-//
-//                    // 5. Clean up resources immediately
-//                    codec.releaseOutputBuffer(index, false)
-////                    cleanup(codec, extractor)
-//                }
-//
-//                override fun onError(
-//                    p0: MediaCodec,
-//                    p1: MediaCodec.CodecException
-//                ) {
-//                }
-//
-//                override fun onOutputFormatChanged(
-//                    p0: MediaCodec,
-//                    p1: MediaFormat
-//                ) {
-//                }
-//
+//                override fun onOutputFormatChanged(p0: MediaCodec, p1: MediaFormat) { format = p1 }
 //            })
-//
-//            extractor.seekTo(0, MediaExtractor.SEEK_TO_PREVIOUS_SYNC)
-//            codec.start()
+
+
+            extractor.seekTo(0, MediaExtractor.SEEK_TO_PREVIOUS_SYNC)
+            codec.start()
+
+
+            val bufferInfo = MediaCodec.BufferInfo()
+            while (true) {
+                val inputBufferId = codec.dequeueInputBuffer(1_000_000)
+                if(!onInputBuffer(inputBufferId)) break
+
+                val outputBufferId = codec.dequeueOutputBuffer(bufferInfo, 1_000_000)
+                onOutputBuffer(outputBufferId)
+                if (outputBufferId == MediaCodec.INFO_OUTPUT_FORMAT_CHANGED)
+                    format = codec.outputFormat
+            }
+
+            onFinish()
         }
     }
 }

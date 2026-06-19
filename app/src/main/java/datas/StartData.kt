@@ -2,22 +2,33 @@ package datas
 
 import Globals
 import MyQueue
+import android.content.Intent
+import android.os.Environment
+import android.view.LayoutInflater
+import android.view.View
+import android.widget.ImageButton
+import android.widget.LinearLayout
+import android.widget.TextView
+import androidx.core.net.toUri
 import com.ollivolland.lemaitre.ActivityHome
 import com.ollivolland.lemaitre.R
 import format
+import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
+import java.util.Date
 
-data class StartData(val id:Long, val timeInit:Long, val timeInitToCommand: Long, val videoLength: Long, val mpStartsBuild:String, val mpIdsBuild:String) {
-    val config: ConfigData = Session.config
-    val timeOfCommand = timeInit + timeInitToCommand
+data class StartData(val id:Long, val time:Long, val timeInitToCommand: Long, val videoLength: Long, val mpStartsBuild:String, val mpIdsBuild:String, val config: ConfigData) {
+    val timeOfCommand = time + timeInitToCommand
     val mpStarts:Array<Long> get() = mpStartsBuild.split(",").map { it.toLong() }.toTypedArray()
     val mpIds:Array<Int> get() = mpIdsBuild.split(",").map { it.toInt() }.toTypedArray()
     var commandDelay:Long? = null
+    val cameras = mutableListOf<String>()
     var isReceivedAll = false
 
 
     fun send(queues: Array<MyQueue>) {
+        isReceivedAll = queues.isEmpty()
         val isReceived = BooleanArray(queues.size) { false }
         for (x in queues.indices)
             queues[x].sendJson(serialize(), JSON_TAG)
@@ -29,14 +40,15 @@ data class StartData(val id:Long, val timeInit:Long, val timeInitToCommand: Long
             }
 
         Session.log("sent start $this")
+        sendInfo(queues)
     }
 
 
     fun sendInfo(queues: Array<MyQueue>) {
         for (x in queues)
             x.sendJson(JSONObject().apply {
-                accumulate("id", id)
-                accumulate("info", serializeInfo())
+                put("id", id)
+                put("info", serializeInfo())
             }, JSON_TAG_INFO)
 
         Session.log("sent start-info $this")
@@ -45,13 +57,13 @@ data class StartData(val id:Long, val timeInit:Long, val timeInitToCommand: Long
 
     fun serialize(): JSONObject {
         return JSONObject().apply {
-            accumulate("id", id)
-            accumulate("timeStamp", timeInit)
-            accumulate("commandLength", timeInitToCommand)
-            accumulate("videoLength", videoLength)
-            accumulate("mpStarts", mpStartsBuild)
-            accumulate("mps", mpIdsBuild)
-            accumulate("info", serializeInfo())
+            put("id", id)
+            put("timeStamp", time)
+            put("commandLength", timeInitToCommand)
+            put("videoLength", videoLength)
+            put("mpStarts", mpStartsBuild)
+            put("mps", mpIdsBuild)
+            put("info", serializeInfo())
         }
     }
 
@@ -59,7 +71,9 @@ data class StartData(val id:Long, val timeInit:Long, val timeInitToCommand: Long
     fun serializeInfo(): JSONObject {
         return JSONObject().apply {
             if(commandDelay != null)
-                accumulate("commandDelay", commandDelay)
+                put("commandDelay", commandDelay)
+
+            put("cameras", JSONArray(cameras))
         }
     }
 
@@ -70,16 +84,7 @@ data class StartData(val id:Long, val timeInit:Long, val timeInitToCommand: Long
 
 
     override fun toString(): String {
-        return "{ id=$id, timestamp=$timeInit }"
-    }
-
-
-    fun feedback():String {
-        var s = "[${Globals.FORMAT_TIME.format(timeInit)}] start ${(if(isReceivedAll) "y" else "n")}"
-        if(commandDelay != null)
-            s += "\nshot: ${(commandDelay!! * .001).format(2)}s"
-
-        return s
+        return "{ id=$id, timestamp=$time }"
     }
 
 
@@ -87,9 +92,44 @@ data class StartData(val id:Long, val timeInit:Long, val timeInitToCommand: Long
         if(jo == null)
             return
 
-        commandDelay = jo.opt("commandDelay")?.toString()?.toLong()
+        commandDelay = jo.opt("commandDelay")?.toString()?.toLong() ?: commandDelay
 
-        save()
+        val arr = jo.optJSONArray("cameras")
+        for (i in 0 until (arr?.length() ?: 0))
+            if(!cameras.contains(arr!!.optString(i)))
+                cameras.add(arr.optString(i))
+    }
+
+
+    fun bindFeed(itemView: View) {
+        val vTitle = itemView.findViewById<TextView>(R.id.start_tTitle)
+        val vText = itemView.findViewById<TextView>(R.id.start_tText)
+        val vButtons = itemView.findViewById<LinearLayout>(R.id.start_buttons)
+
+        vButtons.removeAllViews()
+
+        var s = "start ${(if(isReceivedAll) "y" else "n")}"
+        if(commandDelay != null)
+            s += "\nshot: ${(commandDelay!! * .001).format(2)}s"
+        if(cameras.isNotEmpty()) {
+            s += "\n" + cameras.joinToString(", ")
+
+            for (c in cameras) {
+                val b = LayoutInflater.from(vButtons.context).inflate(R.layout.view_video, vButtons, false)
+                val bb = b.findViewById<ImageButton>(R.id.video_play)
+                bb.setOnClickListener {
+                    val videoUri = "${Environment.getExternalStorageDirectory()}/${Environment.DIRECTORY_DCIM}/VID_${Globals.formatToSeconds.format(Date(time))}_${c}.mp4".toUri()
+                    itemView.context.startActivity(Intent(Intent.ACTION_VIEW, videoUri).apply {
+                        setDataAndType(videoUri, "video/mp4")
+                        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                    })
+                }
+                vButtons.addView(b)
+            }
+        }
+
+        vTitle.text = "${Globals.FORMAT_TIME.format(time)}"
+        vText.text = s
     }
 
 
@@ -129,19 +169,24 @@ data class StartData(val id:Long, val timeInit:Long, val timeInitToCommand: Long
                 }
             }
 
-            return StartData(System.currentTimeMillis(), timeStamp, builder.lastEndMs, videoLength, builder.getBuiltDeltas(timeStamp), builder.getBuiltIds())
+            val s = StartData(System.currentTimeMillis(), timeStamp, builder.lastEndMs, videoLength, builder.getBuiltDeltas(timeStamp), builder.getBuiltIds(), Session.config)
+            s.cameras.addAll(HostData.get!!.clients.indices.filter { HostData.get!!.configClients[it].isCamera }.map { HostData.get!!.clients[it].fingerprint })
+            if(Session.config.isCamera)
+                s.cameras.add(Globals.deviceFingerprint)
+            return s
         }
 
 
         fun parse(jo:JSONObject): StartData? {
             val start = StartData(
-                jo["id"].toString().toLong(),
-                jo["timeStamp"].toString().toLong(),
-                jo["commandLength"].toString().toLong(),
-                jo["videoLength"].toString().toLong(),
+                jo.getLong("id"),
+                jo.getLong("timeStamp"),
+                jo.getLong("commandLength"),
+                jo.getLong("videoLength"),
                 jo["mpStarts"].toString(),
-                jo["mps"].toString(),
+                jo["mps"].toString(), ConfigData("", false)
             )
+            start.receiveInfo(jo.optJSONObject("info"))
             return start
         }
 
@@ -153,7 +198,7 @@ data class StartData(val id:Long, val timeInit:Long, val timeInitToCommand: Long
                 Session.log("received start $start")
             }
             if(tag == JSON_TAG_INFO) {
-                val id = jo["id"].toString().toLong()
+                val id = jo.getLong("id")
                 val start = Session.getStarts().firstOrNull { it.id == id }
                 if(start == null)
                 {
@@ -162,6 +207,7 @@ data class StartData(val id:Long, val timeInit:Long, val timeInitToCommand: Long
                 }
 
                 start.receiveInfo(jo.optJSONObject("info"))
+                start.save()
             }
 
             ActivityHome.invalidateFeedback()

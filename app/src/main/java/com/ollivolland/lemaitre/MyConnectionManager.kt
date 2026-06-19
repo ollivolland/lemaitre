@@ -1,8 +1,8 @@
 package com.ollivolland.lemaitre
 
+import Globals
 import MySocket
 import MyWifiP2p
-import MyWifiP2p.Companion.JSON_KEY_DEVICE_NAME
 import MyWifiP2p.Companion.JSON_KEY_PORT
 import MyWifiP2p.Companion.JSON_TAG_CLIENT_REPLY
 import MyWifiP2p.Companion.JSON_TAG_CONFIG
@@ -25,8 +25,8 @@ import java.net.ServerSocket
 import java.net.Socket
 import kotlin.concurrent.thread
 
+
 class MyConnectionManager(private val activity: MainActivity) {
-    private var isFormationSocketReady = true
     var mySocketFormation: MySocket? = null
     val clients = mutableListOf<Client>()
     var myWifiP2p:MyWifiP2p = MyWifiP2p(activity, WifiP2pManager.ConnectionInfoListener(this::onConnectionInfo))
@@ -37,7 +37,6 @@ class MyConnectionManager(private val activity: MainActivity) {
 
     @SuppressLint("MissingPermission")
     fun init() {
-//        myWifiP2p.myNSD.stopNSD()
         myWifiP2p.disconnectAll {
             Session.setState(Session.State.CLIENT)
             onInit?.invoke()
@@ -47,7 +46,6 @@ class MyConnectionManager(private val activity: MainActivity) {
                 Session.log("NSD discovered")
                 if(!activity.isDestroyed)
                     activity.runOnUiThread { activity.vHost.isEnabled = false }
-
 
                 hostMac = it.deviceAddress
                 val config = WifiP2pConfig().apply {
@@ -60,7 +58,6 @@ class MyConnectionManager(private val activity: MainActivity) {
 
 
         myWifiP2p.onPeersChangedAction = {
-//            Session.log("peerschanged")
             myWifiP2p.manager.requestPeers(myWifiP2p.channel) { list ->
                 if(!isFinished) {
                     for(x in formationDevices - list.deviceList)
@@ -80,8 +77,6 @@ class MyConnectionManager(private val activity: MainActivity) {
         isFinished = true
         myWifiP2p.myNSD.stopNSD()
         myWifiP2p.stopDiscovery()
-//		mySocketFormation?.close()
-//		mySocketFormation = null
     }
 
 
@@ -101,7 +96,7 @@ class MyConnectionManager(private val activity: MainActivity) {
 
 
     fun launchHost() {
-        HostData.set(myWifiP2p.deviceName, clients)
+        HostData.set(Globals.deviceName, clients)
         finish()
 
         Session.log("formed with ${clients.size} clients")
@@ -109,12 +104,10 @@ class MyConnectionManager(private val activity: MainActivity) {
 
 
     fun createFormationSocketHost() {
-        if (isFormationSocketReady) {
-            isFormationSocketReady = false
-            val port = MainActivity.PORT_COMMUNICATION + clients.count()
-            var ip = ""
-
-            thread {
+        thread {
+            while (true) {
+                val port = MainActivity.PORT_COMMUNICATION + clients.count()
+                var ip = ""
                 mySocketFormation = MySocket(HostData.formationSocket.accept(), "server").apply {
                     addOnConfigured {
                         ip = it.inetAddress.hostAddress!!
@@ -128,18 +121,17 @@ class MyConnectionManager(private val activity: MainActivity) {
 
                         val client = Client(
                             ip,
+                            jo.getString(JSON_KEY_P2P_NAME),
                             port,
-                            jo[JSON_KEY_DEVICE_NAME] as String
-                        )   //, jo["address"] as String)
+                            jo.getString(JSON_KEY_DEVICE_NAME),
+                            jo.getString(JSON_KEY_FINGERPRINT),
+                            jo.getString(JSON_KEY_P2P_ADDRESS),
+                        )
                         client.create()
                         clients.add(client)
-                        Session.log("client ${client.name} on [$port] => $ip")
+                        Session.log("client ${client.humanName} on [$port] => $ip")
 
                         this.close()
-                    }
-                    addOnClose {
-                        isFormationSocketReady = true
-                        createFormationSocketHost()
                     }
                     setSocketConfigured()
                 }
@@ -156,13 +148,16 @@ class MyConnectionManager(private val activity: MainActivity) {
                     if (tag != JSON_TAG_CONFIG) return@addOnJson
 
                     this.write(JSONObject().apply {
-                        accumulate(JSON_KEY_DEVICE_NAME, myWifiP2p.deviceName)
+                        put(JSON_KEY_DEVICE_NAME, Globals.deviceName)
+                        put(JSON_KEY_P2P_NAME, myWifiP2p.deviceName)
+                        put(JSON_KEY_P2P_ADDRESS, myWifiP2p.deviceAddress)
+                        put(JSON_KEY_FINGERPRINT, Globals.deviceFingerprint)
                     }, JSON_TAG_CLIENT_REPLY)
 
                     ClientData.set(
                         jo[JSON_KEY_PORT] as Int,
                         info.groupOwnerAddress.hostAddress!!,
-                        myWifiP2p.deviceName,
+                        Globals.deviceName,
                         activity
                     )
                     Session.log("host = ${ClientData.get!!.port}")
@@ -210,17 +205,17 @@ class MyConnectionManager(private val activity: MainActivity) {
         if(HostData.get != null) {
             myWifiP2p.manager.requestPeers(myWifiP2p.channel) { list ->
                 HostData.get!!.clients.forEachIndexed { i, cl ->
-                    val now = list.deviceList.filter { it.deviceName == cl.name }
+                    val now = list.deviceList.filter { it.deviceAddress == cl.deviceAddress }
                     val isConnecting = now.size == 1 && now[0].status == WifiP2pDevice.CONNECTED
 
                     if (cl.isConnected && !isConnecting) {
-                        Session.log("${cl.name} disconnected")
+                        Session.log("${cl.humanName} disconnected")
                         myWifiP2p.manager.discoverPeers(myWifiP2p.channel, MyWifiP2pActionListener("discoverPeers host reconnect"))
                         HostData.get!!.clients[i].socket?.socket?.close()
                         HostData.get!!.clients[i].socket?.close()
                     }
                     if (!cl.isConnected && isConnecting) {
-                        Session.log("${cl.name} reconnected")
+                        Session.log("${cl.humanName} reconnected")
 //                        HostData.get!!.socket[i].close()
                         if(HostData.get!!.clients.count { !it.isConnected } == 1)
                             myWifiP2p.manager.stopPeerDiscovery(myWifiP2p.channel, MyWifiP2pActionListener("stopPeerDiscovery host reconnect"))
@@ -255,5 +250,13 @@ class MyConnectionManager(private val activity: MainActivity) {
                 )
             }
         }
+    }
+
+
+    companion object {
+        const val JSON_KEY_DEVICE_NAME = "name"
+        const val JSON_KEY_P2P_NAME = "p2pname"
+        const val JSON_KEY_FINGERPRINT = "fingerprint"
+        const val JSON_KEY_P2P_ADDRESS = "p2paddress"
     }
 }

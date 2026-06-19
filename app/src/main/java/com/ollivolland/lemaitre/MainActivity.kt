@@ -33,20 +33,16 @@ import kotlin.concurrent.thread
 class MainActivity : Activity() {
     //  by urgency
     //  todo    CRASHES CAUSE of gps permisson
-    //  todo    retransmit on reconnect
     //  todo    check if cam profile is available
-    //  todo    host send delay&gate, display only once both received
     //  todo    video timestamp
     //  todo    display images
     //  todo    stop start on all devices
     //  todo    dialog spinner info
     //  todo    separate home warnings and errors
     //  todo    home disable buttons on error
-    //  todo    camera & gate orientation
     //  todo    display storage space
 
     //  todo    hard logs
-    //  todo    register nsd with client instead of host
 
     //  big
     //  todo    audioTrack instead of MediaPlayer   https://stackoverflow.com/questions/12263671/audiotrack-android-playing-sounds-from-raw-folder
@@ -61,6 +57,7 @@ class MainActivity : Activity() {
     private lateinit var vLogger:TextView
     private lateinit var vFeedback:TextView
     lateinit var vHost: Button
+
 
     @SuppressLint("UnsafeOptInUsageError")
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -140,7 +137,7 @@ class MainActivity : Activity() {
                     vFeedback.text = when {
                         Session.isHost -> {
                             if(connectionManager.clients.isEmpty()) "no clients"
-                            else connectionManager.clients.joinToString("\n") { it.name }
+                            else connectionManager.clients.joinToString("\n") { it.humanName }
                         }
                         Session.isClient -> if(ClientData.get == null) "waiting for host" else "CONNECTED"
                         else -> "choose"
@@ -157,10 +154,12 @@ class MainActivity : Activity() {
 //        }
     }
 
+
     override fun onDestroy() {
         super.onDestroy()
         isRunning = false
     }
+
 
     private fun buildAlertMessageNoGps() {
         val locationRequest = LocationRequest.create().setPriority(LocationRequest.PRIORITY_HIGH_ACCURACY).setInterval(100).setFastestInterval(100)
@@ -179,7 +178,8 @@ class MainActivity : Activity() {
                     startActivityForResult(Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS), 1001)
             }
     }
-    
+
+
     @Deprecated("Deprecated in Java")
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
@@ -190,6 +190,7 @@ class MainActivity : Activity() {
             connectionManager.myWifiP2p.requestConnectionInfo()
         }
     }
+
 
     companion object {
         const val PORT_FORMATION = 8888

@@ -103,7 +103,7 @@ open class MySocket(val socket: Socket, private val type:String) {
         if(tag != JSON_TAG_UPDATE)
             Session.log("[${socket.port}] sent JSON $tag")
         write(jo.apply {
-            accumulate("tag", tag)
+            put("tag", tag)
         }.toString().encodeToByteArray())
     }
 
@@ -115,11 +115,13 @@ open class MySocket(val socket: Socket, private val type:String) {
             return
         }
 
-        executor.execute {
-            try {
-                mOutputStream.write(byteArray)
-                mOutputStream.flush()
-            } catch (_:Exception) {
+        synchronized(executor) {
+            executor.execute {
+                try {
+                    mOutputStream.write(byteArray)
+                    mOutputStream.flush()
+                } catch (_: Exception) {
+                }
             }
         }
     }

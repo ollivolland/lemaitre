@@ -32,6 +32,7 @@ class MyWifiP2p(private val activity: MainActivity, private val mConnectionInfoL
 					println("WIFI_P2P_THIS_DEVICE_CHANGED_ACTION")
 					if(device != null && deviceName.isEmpty()) {
 						deviceName = device.deviceName
+						deviceAddress = device.deviceAddress
 						Session.log("deviceName = ${deviceName}:${isWifiP2pEnabled}")
 					}
 
@@ -69,6 +70,7 @@ class MyWifiP2p(private val activity: MainActivity, private val mConnectionInfoL
 	}
 	val myNSD = MyNSD(this)
 	var deviceName: String = ""
+	var deviceAddress: String = ""
 	private var isOpen = true
 	var lastConnectionInfo = 0L
 
@@ -147,8 +149,7 @@ class MyWifiP2p(private val activity: MainActivity, private val mConnectionInfoL
 		const val JSON_TAG_CONFIG = "wifip2pconfig"
 		const val JSON_TAG_CLIENT_REPLY = "wifip2preply"
 		const val JSON_KEY_PORT = "useport"
-		const val JSON_KEY_DEVICE_NAME = "name"
-		
+
 		var get:MyWifiP2p? = null
 
 		private val INTENT_FILTER = IntentFilter().apply {

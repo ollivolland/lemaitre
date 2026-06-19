@@ -89,9 +89,9 @@ class MyCamera2(val context: Activity) {
 	
 	fun addPreview(vTextureView: TextureView) = MyPreview(this, vTextureView)
 	
-	fun addRecorder(recordingProfile: MyRecorder.RecordingProfileBuilder):MyRecorder {
+	fun addRecorder(recordingProfile: MyRecorder.RecordingProfileBuilder, ts: Long):MyRecorder {
 		fps = max(fps, recordingProfile.fps)
-		return MyRecorder(this, recordingProfile)
+		return MyRecorder(this, recordingProfile, ts)
 	}
 	
 	fun addReader(readerProfileBuilder: MyReader.ReaderProfileBuilder, listener:ImageReader.OnImageAvailableListener):MyReader = MyReader(this, readerProfileBuilder, listener)

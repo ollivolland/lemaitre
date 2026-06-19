@@ -90,7 +90,7 @@ class ActivityStart : AppCompatActivity() {
                         bytesPerSecond = 20_000_000
                     }
                 }
-            })
+            }, start.time)
             isCameraStarted = false
             isCameraStopped = false
         }
@@ -292,7 +292,6 @@ class ActivityStart : AppCompatActivity() {
         const val DURATION_VIDEO_BEFORE_START = 3000L
 
         var startData: StartData? = null;private set
-        var broadcastFeedback:((String)->Unit)? = null;private set
         var isBusy = false;private set
 
 
@@ -301,7 +300,6 @@ class ActivityStart : AppCompatActivity() {
 
             isBusy = true
             this.startData = startData
-            this.broadcastFeedback = activityHome::broadcastFeedback
 
             activityHome.startActivity(Intent(activityHome, ActivityStart::class.java))
         }

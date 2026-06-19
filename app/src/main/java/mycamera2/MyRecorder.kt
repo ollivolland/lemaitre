@@ -1,5 +1,6 @@
 package mycamera2
 
+import Globals
 import android.hardware.camera2.CameraCharacteristics
 import android.media.MediaCodec
 import android.media.MediaCodecInfo
@@ -10,32 +11,30 @@ import android.os.Environment
 import android.os.ParcelFileDescriptor
 import android.util.Log
 import createVideoURI
+import datas.ClientData
 import datas.HostData
 import datas.Session
 import java.io.File
-import java.text.SimpleDateFormat
 import java.util.Date
-import java.util.Locale
 
-class MyRecorder internal constructor(private val myCamera2: MyCamera2, private val recordingProfileBuilder: RecordingProfileBuilder) {
+class MyRecorder internal constructor(private val myCamera2: MyCamera2, private val recordingProfileBuilder: RecordingProfileBuilder, private val ts: Long) {
 	private val codec: MediaCodec
 	private var isWrite = false
 	private var isWantStart = false
 	private var isWantStop = false
 	private val muxer: MediaMuxer
-	private val formatToSeconds = SimpleDateFormat("yyyyMMdd-HHmmss", Locale.ENGLISH)
 	private val recordingProfile = recordingProfileBuilder.build()
+
+
 	
 	init {
 		val surfaceObservable = myCamera2.addSurface()
 		
 		//  Format
-		val fileName = "VID_${formatToSeconds.format(Date(System.currentTimeMillis()))}.mp4"
-//		val path = "${Globals.dirVideos}/VID_${formatToSeconds.format(Date(System.currentTimeMillis()))}.mp4"
-//		File(path).createNewFile()
+		val fileName = "VID_${Globals.formatToSeconds.format(Date(ts))}_${Globals.deviceFingerprint}.mp4"
 		val mimeType = MediaFormat.MIMETYPE_VIDEO_AVC
 		lateinit var pdf: ParcelFileDescriptor
-		val uri = createVideoURI(myCamera2.context, fileName) {
+		createVideoURI(myCamera2.context, fileName) {
 			pdf = myCamera2.context.contentResolver.openFileDescriptor(it, "w")!!
 		}
 		val format = MediaFormat.createVideoFormat(mimeType, recordingProfile.width, recordingProfile.height)
@@ -112,6 +111,8 @@ class MyRecorder internal constructor(private val myCamera2: MyCamera2, private 
 
 			if(Session.isHost) {
 				HostData.get!!.clients.forEach { it.socket?.writeFile(File("${Environment.getExternalStorageDirectory()}/${Environment.DIRECTORY_DCIM}/$fileName").readBytes(), fileName) }
+			} else {
+				ClientData.get!!.socket?.writeFile(File("${Environment.getExternalStorageDirectory()}/${Environment.DIRECTORY_DCIM}/$fileName").readBytes(), fileName)
 			}
 		}
 		

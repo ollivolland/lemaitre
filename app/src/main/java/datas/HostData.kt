@@ -20,7 +20,7 @@ import java.net.ServerSocket
 import kotlin.concurrent.thread
 
 class HostData private constructor(val hostName:String, val clients: Array<Client>) {
-    private val configClients:Array<ConfigData>
+    val configClients:Array<ConfigData>
     var command:String = COMMAND_CHOICES[0]
     var flavor:Long = FLAVOR_CHOICES[0]
     var delta:Long = DELTA_CHOICES[0]
@@ -31,7 +31,7 @@ class HostData private constructor(val hostName:String, val clients: Array<Clien
     init {
         //  set configs
         Session.config = ConfigData(hostName, true)
-        configClients = Array(clients.size) { i -> ConfigData(clients[i].name) }
+        configClients = Array(clients.size) { i -> ConfigData(clients[i].humanName) }
     }
     
     fun setClientConfig(i:Int, config: ConfigData) {
@@ -86,11 +86,13 @@ class HostData private constructor(val hostName:String, val clients: Array<Clien
 
         var get: HostData? = null; private set
 
+
         fun set(hostName: String, clients: MutableList<Client>) {
             if(ClientData.get != null) throw Exception()
             
             get = HostData(hostName, clients.toTypedArray())
         }
+
 
         lateinit var formationSocket: ServerSocket
     }
@@ -98,9 +100,12 @@ class HostData private constructor(val hostName:String, val clients: Array<Clien
 
 
 class Client(
-    val ipWifiP2p:String,
+    val ip:String,
+    val wifiP2pName:String,   //  set to ip
     val port:Int,
-    val name:String,
+    val humanName:String,
+    val fingerprint:String,
+    val deviceAddress:String,
     var isConnected:Boolean = true,
     var socket: MySocket? = null) {
     var lastUpdate: Long = 0

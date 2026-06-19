@@ -10,12 +10,15 @@ import android.app.TimePickerDialog
 import android.content.Intent
 import android.os.Bundle
 import android.view.View
+import android.view.ViewGroup
 import android.view.WindowManager
 import android.widget.ImageButton
 import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
+import androidx.recyclerview.widget.LinearLayoutManager
+import androidx.recyclerview.widget.RecyclerView
 import datas.ClientData
 import datas.HostData
 import datas.Session
@@ -27,7 +30,7 @@ import kotlin.concurrent.thread
 
 class ActivityHome : AppCompatActivity() {
     private lateinit var vLogger: TextView
-    private lateinit var vFeedback: TextView
+    private lateinit var vRecycler: RecyclerView
     private lateinit var vImportant: TextView
     private lateinit var vPreview: ImageButton
     private lateinit var viewGlobal:ViewDevice
@@ -47,14 +50,14 @@ class ActivityHome : AppCompatActivity() {
         println("HOME CREATED")
 
         vLogger = findViewById(R.id.home_tLogger)
-        vFeedback = findViewById(R.id.home_tFeedback)
+        vRecycler = findViewById(R.id.home_tFeedback)
         vImportant = findViewById(R.id.home_tImportant)
         vPreview = findViewById(R.id.home_bPreview)
         val vBlinker = findViewById<View>(R.id.home_vBlinker)
         val vConfig = findViewById<LinearLayout>(R.id.home_lConfig)
         val vButtons = findViewById<LinearLayout>(R.id.home_lButtons)
-
         val vDisconnect = findViewById<ImageButton>(R.id.home_disconnect)
+
         vDisconnect.visibility = if(Session.isHost) View.GONE else View.VISIBLE
     
         vPreview.setOnClickListener {
@@ -63,6 +66,18 @@ class ActivityHome : AppCompatActivity() {
     
         MyWifiP2p.get?.stopDiscovery()
         MyWifiP2p.get?.myNSD?.stopNSD()
+
+        vRecycler.layoutManager = LinearLayoutManager(this)
+        vRecycler.setItemViewCacheSize(30)
+        vRecycler.adapter = object: RecyclerView.Adapter<RecyclerView.ViewHolder>() {
+            override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): RecyclerView.ViewHolder {
+                return object: RecyclerView.ViewHolder(this@ActivityHome.layoutInflater.inflate(R.layout.view_start, vRecycler, false)) {}
+            }
+
+            override fun getItemCount(): Int = starts.size
+
+            override fun onBindViewHolder(holder: RecyclerView.ViewHolder, i: Int) = starts[i].bindFeed(holder.itemView)
+        }
 
         //  *****   HOST
         if(Session.isHost) {
@@ -187,7 +202,7 @@ class ActivityHome : AppCompatActivity() {
                 
                 //  start starts
                 for (x in Session.getStarts())
-                    if(!ActivityStart.isBusy && !hasLaunched.contains(x.id) && x.timeInit < MyTimer.getTime() + TIME_START)
+                    if(!ActivityStart.isBusy && !hasLaunched.contains(x.id) && x.time < MyTimer.getTime() + TIME_START)
                     {
                         hasLaunched.add(x.id)
                         ActivityStart.launch(this, x)
@@ -203,13 +218,15 @@ class ActivityHome : AppCompatActivity() {
                     vImportant.setString(
                     "${Globals.FORMAT_TIME.format(MyTimer.getTime())}\n\n"+ when {
                         all.isEmpty() -> "no start scheduled"
-                        all.size < 5  -> "will start at\n${all.sortedBy { it.timeInit }.joinToString("\n") { Globals.FORMAT_TIME.format(it.timeInit) }}"
-                        else          -> "will start at\n${all.sortedBy { it.timeInit }.take(4).joinToString("\n") { Globals.FORMAT_TIME.format(it.timeInit) }}\n + ${all.size-4} others"
+                        all.size < 5  -> "will start at\n${all.sortedBy { it.time }.joinToString("\n") { Globals.FORMAT_TIME.format(it.time) }}"
+                        else          -> "will start at\n${all.sortedBy { it.time }.take(4).joinToString("\n") { Globals.FORMAT_TIME.format(it.time) }}\n + ${all.size-4} others"
                     })
-                    synchronized(feedbacks) {
-                        vFeedback.setString(feedbacks.reversed().joinToString("\n"))
-                    }
                     vLogger.text = Session.getLogs().takeLast(20).reversed().joinToString("\n")
+
+                    if (isDataUpdated) {
+                        isDataUpdated = false
+                        vRecycler.adapter!!.notifyDataSetChanged()
+                    }
                     
                     //  host configs
                     if (Session.isHost) {
@@ -225,10 +242,6 @@ class ActivityHome : AppCompatActivity() {
                                 else ->
                                     viewConfigClients[i].updateView(configCopy[i], "[connected]")
                             }
-
-//                        for (i in configCopy.indices)
-//                            if(data.clients[i]. MyTimer.getTime() - data.clients[i].lastUpdate > 30_000L)
-//                                MyWifiP2p.get!!.manager.removeGroup(MyWifiP2p.get!!.channel, MyWifiP2pActionListener("manualCancelConnect"))
                     }
                     
                     updateOwnConfig()
@@ -277,34 +290,17 @@ class ActivityHome : AppCompatActivity() {
         vPreview.visibility = if(Session.config.isCamera || Session.config.isGate) View.VISIBLE else View.GONE
     }
 
-    
-    fun broadcastFeedback(string: String) {
-        if(Session.isHost) {
-            HostData.get!!.clients.forEach {
-                Session.sendFeedback(it.socket, string)
-            }
-        }
-        else {
-            Session.sendFeedback(ClientData.get!!.socket, string)
-        }
-    }
-
 
     companion object {
         const val TIME_START = 3_000L
         const val TIME_CONNECTION_TIMEOUT = 3_000L
-        private val feedbacks:MutableList<String> = mutableListOf()
+        private var starts: Array<StartData> = Session.getStarts()
+        private var isDataUpdated = true
 
 
         fun invalidateFeedback() {
-            synchronized(feedbacks) {
-                feedbacks.clear()
-
-                for(x in Session.getStarts()) {
-                    feedbacks.add(x.feedback())
-                    feedbacks.add("\n\n")
-                }
-            }
+            starts = Session.getStarts()
+            isDataUpdated = true
         }
     }
 }

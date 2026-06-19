@@ -44,6 +44,9 @@ dependencies {
     //  google
     implementation 'com.google.android.gms:play-services-location:21.0.1'
 //    implementation 'androidx.media3:media3-inspector:1.10.1'
+//
+//    implementation 'com.quickbirdstudios:opencv:3.4.1'
+    implementation "org.opencv:opencv:4.10.0"
 
 
 //    testImplementation 'junit:junit:4.13.2'

@@ -1,14 +1,18 @@
 import android.util.Log
+import com.ollivolland.lemaitre.MyApp
 import datas.HostData.Companion.JSON_TAG_UPDATE
 import datas.Session
 import org.json.JSONObject
+import java.io.File
+import java.io.FileOutputStream
 import java.io.InputStream
 import java.io.OutputStream
 import java.net.Socket
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
+import kotlin.math.min
 
-abstract class MySocket(val socket: Socket, val port: Int, private val type:String) {
+open class MySocket(val socket: Socket, private val type:String) {
     private val executor: ExecutorService = Executors.newSingleThreadExecutor()
     private val myOnSocketListener = mutableListOf<((Socket) -> Unit)?>()
     private val myOnCloseListeners = mutableListOf<(() -> Unit)?>()
@@ -22,19 +26,37 @@ abstract class MySocket(val socket: Socket, val port: Int, private val type:Stri
 
 
     init {
-        log("[$port] $type creating")
+        log("[${socket.port}] $type creating")
     }
 
 
     private fun receiveFromInputStream() {
         val buffer = ByteArray(1024)
         var length:Int
+        var fos: FileOutputStream? = null
+        var fileLength = 0L
         
         //  read
         while(isWantOpen) {
             try {
+                if(mInputStream.available() <= 0) continue
                 length = mInputStream.read(buffer)
                 if(length < 0) continue
+
+                if(fileLength > 0L) {
+                    fos!!.write(buffer, 0, min(fileLength, length.toLong()).toInt())
+                    fileLength -= min(fileLength, length.toLong())
+//                    Session.log("File remaining $fileLength")
+
+                    if(fileLength <= 0)
+                    {
+                        fos.flush()
+                        fos.close()
+                        fos = null
+                        Session.log("File completed")
+                    }
+                    continue
+                }
     
                 //  listeners
                 if(myOnJSONListeners.isNotEmpty()) {
@@ -42,15 +64,32 @@ abstract class MySocket(val socket: Socket, val port: Int, private val type:Stri
                         val jo = JSONObject(String(buffer, 0, length))
                         val tag = jo["tag"].toString()
                         if(tag != JSON_TAG_UPDATE)
-                            Session.log("[$port] received JSON $tag")
+                            Session.log("[${socket.port}] received JSON $tag")
+                        if(tag == TAG_FILE) {
+                            fileLength = jo.optLong(TAG_SIZE, 0)
+                            val fileName = jo.optString(TAG_NAME, "_.txt")
+                            val path = Globals.dirExternal.absolutePath + "/" + jo.optString(TAG_NAME, "_.txt")
+                            Session.log("[${socket.port}] received File $fileLength at $path")
+                            File(path).createNewFile()
+
+                            if(path.contains(".mp4"))
+                                createVideoURI(MyApp.appContext, fileName) {
+                                    fos = MyApp.appContext.contentResolver.openOutputStream(it) as FileOutputStream?
+                                }
+                            else
+                                fos = FileOutputStream(path)
+                        }
             
                         for (x in myOnJSONListeners)
                             try { x?.invoke(jo, tag) }
                             catch (e:Exception) { e.printStackTrace() }
-                    } catch (_:Exception) { }
+                    } catch (e:Exception) {
+                        e.printStackTrace()
+                    }
                 }
             } catch (e:Exception) {
                 Log.e("SOCKET", "exception ${e.stackTrace}")
+                e.printStackTrace()
                 isWantOpen = false
             }
         }
@@ -62,14 +101,14 @@ abstract class MySocket(val socket: Socket, val port: Int, private val type:Stri
 
     fun write(jo:JSONObject, tag:String) {
         if(tag != JSON_TAG_UPDATE)
-            Session.log("[$port] sent JSON $tag")
+            Session.log("[${socket.port}] sent JSON $tag")
         write(jo.apply {
             accumulate("tag", tag)
         }.toString().encodeToByteArray())
     }
 
 
-    private fun write(byteArray: ByteArray) {
+    fun write(byteArray: ByteArray) {
         if(!isWantOpen) return
         if(!this::mOutputStream.isInitialized) {
             myOnSocketListener.add { write(byteArray) } //  broken
@@ -79,10 +118,18 @@ abstract class MySocket(val socket: Socket, val port: Int, private val type:Stri
         executor.execute {
             try {
                 mOutputStream.write(byteArray)
+                mOutputStream.flush()
             } catch (_:Exception) {
             }
         }
     }
+
+
+    fun writeFile(byteArray: ByteArray, name: String) {
+        write(JSONObject().apply { put(TAG_NAME, name);put(TAG_SIZE, byteArray.size) }, TAG_FILE)
+        write(byteArray)
+    }
+
     
     fun setSocketConfigured() {
         if(isSocketConfigured) throw Exception()
@@ -91,11 +138,14 @@ abstract class MySocket(val socket: Socket, val port: Int, private val type:Stri
         mInputStream = socket.getInputStream()
         mOutputStream = socket.getOutputStream()
 
-        log("[$port] $type created ${socket.localAddress.hostAddress} => ${socket.inetAddress.hostAddress}")
+        log("[${socket.port}] $type created ${socket.localAddress.hostAddress} => ${socket.inetAddress.hostAddress}")
         for (x in myOnSocketListener) x?.invoke(socket)
         
         //  now read
         receiveFromInputStream()
+
+        log("[${socket.port}] $type closed")
+        for (x in myOnCloseListeners) x?.invoke()
     }
 
     fun close() {
@@ -103,11 +153,8 @@ abstract class MySocket(val socket: Socket, val port: Int, private val type:Stri
             return
 
         isClosed = true
-        executor.execute { isInputOpen = false }
         isWantOpen = false
-
-        log("[$port] $type closed")
-        for (x in myOnCloseListeners) x?.invoke()
+        executor.execute { isInputOpen = false }
     }
 
     fun addOnConfigured(action:(Socket) -> Unit) {
@@ -129,15 +176,70 @@ abstract class MySocket(val socket: Socket, val port: Int, private val type:Stri
 
     companion object {
         val log:((String)->Unit) = { it -> Session.log(it) }
+        val TAG_FILE = "@File"
+        val TAG_NAME = "@File-name"
+        val TAG_SIZE = "@File-size"
     }
 }
 
-class MyClientThread(socket: Socket, private val inetAddress: String, port: Int): MySocket(socket, port, "client") {
-    init {
-    }
-}
 
-class MyServerThread(serverSocket: Socket, port:Int): MySocket(serverSocket, port, "server") {
-    init {
+class MyQueue {
+    private var i = 0
+    private var socket:MySocket? = null
+    private val queue = mutableMapOf<Int, ByteArray>()
+    data class Listener(val i: Int, val f:()-> Unit)
+    private val listeners = mutableListOf<Listener>()
+
+
+    fun attach(socket: MySocket) {
+        this.socket = socket
+        socket.addOnClose { if(this.socket == socket) this.socket = null }
+        socket.addOnJson { jo, tag ->
+            if(tag == TAG_QUEUE_SEND) {
+                val received = jo.optInt(TAG_INDEX, -1)
+                socket.write(JSONObject().apply { put(TAG_INDEX, received) }, TAG_QUEUE_RECEIVE)
+            }
+            else if(tag == TAG_QUEUE_RECEIVE) {
+                val received = jo.optInt(TAG_INDEX, -1)
+                queue.remove(received)
+                listeners.filter { it.i == received }.forEach { it.f.invoke() }
+                listeners.removeAll { it.i == received }
+            }
+        }
+        resend()
+    }
+
+
+    private fun resend() {
+        for ((i, x) in queue) {
+            socket?.write(x)
+            socket?.write(JSONObject().apply { put(TAG_INDEX, i) }, TAG_QUEUE_SEND)
+        }
+    }
+
+
+    fun send(any: ByteArray) {
+        queue[i] = any
+        socket?.write(any)
+        socket?.write(JSONObject().apply { put(TAG_INDEX, i) }, TAG_QUEUE_SEND)
+        i++
+    }
+
+
+    fun sendJson(jo:JSONObject, tag:String) {
+        send(jo.apply {
+            accumulate("tag", tag)
+        }.toString().encodeToByteArray())
+    }
+    fun sendJson(jo: JSONObject, tag: String, f:()-> Unit) {
+        listeners.add(Listener(i, f))
+        sendJson(jo, tag)
+    }
+
+
+    companion object {
+        const val TAG_QUEUE_SEND = "@Queue-send"
+        const val TAG_QUEUE_RECEIVE = "@Queue-receive"
+        const val TAG_INDEX = "received"
     }
 }

@@ -1,7 +1,5 @@
 package com.ollivolland.lemaitre
 
-import MyClientThread
-import MyServerThread
 import MySocket
 import MyWifiP2p
 import MyWifiP2p.Companion.JSON_KEY_DEVICE_NAME
@@ -117,7 +115,7 @@ class MyConnectionManager(private val activity: MainActivity) {
             var ip = ""
 
             thread {
-                mySocketFormation = MyServerThread(HostData.formationSocket.accept(),MainActivity.PORT_FORMATION).apply {
+                mySocketFormation = MySocket(HostData.formationSocket.accept(), "server").apply {
                     addOnConfigured {
                         ip = it.inetAddress.hostAddress!!
 
@@ -153,7 +151,7 @@ class MyConnectionManager(private val activity: MainActivity) {
     fun createFormationSocketClient(info: WifiP2pInfo) {
         thread {
             val socket = Socket()
-            mySocketFormation = MyClientThread(socket,  info.groupOwnerAddress.hostAddress!!, MainActivity.PORT_FORMATION).apply {
+            mySocketFormation = MySocket(socket, "client").apply {
                 addOnJson { jo, tag ->
                     if (tag != JSON_TAG_CONFIG) return@addOnJson
 

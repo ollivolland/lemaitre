@@ -195,8 +195,8 @@ class ActivityStart : AppCompatActivity() {
                                 println("FOUND level [${"%05d".format(time)} ms] = ${hundreds[i]}")
                                 start.commandDelay = time
                                 start.save()
-                                start.sendInfo(HostData.get!!.clients.map { it.socket }.toTypedArray())
-                                ActivityHome.showFeedback()
+                                start.sendInfo(HostData.get!!.clients.map { it.queue }.toTypedArray())
+                                ActivityHome.invalidateFeedback()
                             }
                             else
                                 println("level [${"%05d".format(time)} ms] = ${hundreds[i]}")

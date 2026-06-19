@@ -1,6 +1,7 @@
 package datas
 
-import MyClientThread
+import MyQueue
+import MySocket
 import MyTimer
 import android.content.Intent
 import com.google.firebase.crashlytics.FirebaseCrashlytics
@@ -12,9 +13,11 @@ import java.net.Socket
 import kotlin.concurrent.thread
 
 class ClientData private constructor(val port: Int, val hostAddress:String, val deviceName:String, private var mainActivity: MainActivity?) {
-    var socket: MyClientThread? = null
+    var socket: MySocket? = null
     var lastUpdate = MyTimer.getTime()
     var isHasHostGps = false
+    val queue = MyQueue()
+
 
     init {
         println("ClientData init")
@@ -22,18 +25,20 @@ class ClientData private constructor(val port: Int, val hostAddress:String, val 
 
         replaceSocket()
     }
-    
+
+
     fun replaceSocket() {
         Session.log("replaceSocket")
         socket?.socket?.close()
         socket?.close()
-        socket = MyClientThread(Socket(), hostAddress, port)
+        socket = MySocket(Socket(), "client")
         thread {
             Thread.sleep(1000)
             try {
                 socket!!.socket.connect(InetSocketAddress(hostAddress, port), 60_000)
+                queue.attach(socket!!)
                 socket!!.addOnJson { jo, tag ->
-                    Session.tryReceiveFeedback(jo, tag, ActivityHome::showFeedback)
+                    Session.tryReceiveFeedback(jo, tag, ActivityHome::invalidateFeedback)
                 }
                 socket!!.addOnJson { jo, tag ->
                     println("socket received $tag")

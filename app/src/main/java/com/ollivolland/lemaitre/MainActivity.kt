@@ -2,7 +2,6 @@ package com.ollivolland.lemaitre
 
 import Globals
 import GpsTime
-import Velocity
 import android.Manifest
 import android.annotation.SuppressLint
 import android.app.Activity
@@ -83,6 +82,9 @@ class MainActivity : Activity() {
         if (toGrant.isNotEmpty()) requestPermissions(toGrant, 1)
         
         //  files
+        if(!Globals.dirStarts.exists())
+            Globals.dirStarts.mkdir()
+
         val dir = getExternalFilesDir(null)
         if(!File("$dir\\$PATH_SENSITIVITY").exists())
             File("$dir\\$PATH_SENSITIVITY").writeText("1000")
@@ -151,7 +153,7 @@ class MainActivity : Activity() {
 
         //  Todo
 //        thread {
-            Velocity.extract(this, Globals.dirDownload.absolutePath + "/velocity-test.mp4")
+//            Velocity.extract(this, Globals.dirDownload.absolutePath + "/velocity-test-4.mp4")
 //        }
     }
 

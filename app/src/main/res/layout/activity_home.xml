@@ -30,6 +30,18 @@
             android:layout_height="wrap_content"
             android:orientation="vertical"
             />
+
+        <ImageButton
+            android:id="@+id/home_disconnect"
+            style="@style/Theme.Lemaitre2.ImageButton"
+            android:layout_width="24dp"
+            android:layout_height="24dp"
+            android:enabled="true"
+            android:src="@drawable/sharp_restart_alt_24"
+            android:scaleType="fitCenter"
+            android:background="#0000"
+            android:visibility="gone"
+            />
     
         <ImageButton android:id="@+id/home_bPreview"
             style="@style/Theme.Lemaitre2.ImageButton"
@@ -93,15 +105,6 @@
             android:paddingStart="50dp"
             android:textSize="16sp"
             android:textColor="@color/black"
-            />
-
-        <Button
-            android:id="@+id/home_disconnect"
-            style="@style/Theme.Lemaitre2.Button"
-            android:layout_width="100dp"
-            android:layout_height="100dp"
-            android:text="disconnect"
-            android:enabled="true"
             />
 
         <TextView

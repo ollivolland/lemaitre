@@ -1,6 +1,6 @@
 package datas
 
-import MyServerThread
+import MyQueue
 import MySocket
 import MyTimer
 import android.app.Dialog
@@ -29,7 +29,6 @@ class HostData private constructor(val hostName:String, val clients: Array<Clien
 
 
     init {
-
         //  set configs
         Session.config = ConfigData(hostName, true)
         configClients = Array(clients.size) { i -> ConfigData(clients[i].name) }
@@ -78,8 +77,8 @@ class HostData private constructor(val hostName:String, val clients: Array<Clien
         const val COMMAND_BIEP = "biep"
         val COMMAND_CHOICES = arrayOf(COMMAND_KURZ, COMMAND_MITTEL, COMMAND_LANG, COMMAND_BIEP)
         val COMMAND_DESCRIPTIONS = arrayOf("Wettkampf 1-2s", "Kommando 1.5-3s", "Kommando 2-4s", "Biep")
-        val FLAVOR_CHOICES = arrayOf(10_000L, 15_000L, 20_000L, 30_000L)
-        val FLAVOR_DESCRIPTIONS = arrayOf("flavor 10s", "flavor 15s", "flavor 20s", "flavor 30s")
+        val FLAVOR_CHOICES = arrayOf(0L, 10_000L, 15_000L, 20_000L, 30_000L)
+        val FLAVOR_DESCRIPTIONS = arrayOf("sofort", "+10s", "+15s", "+20s", "+30s")
         val DURATION_CHOICES = arrayOf(10_000L, 20_000L, 30_000L, 60_000L, 0L)
         val DURATION_DESCRIPTIONS = arrayOf("duration 10s", "duration 20s", "duration 30s", "duration 60s", "null")
         val DELTA_CHOICES = arrayOf(3_000L, 10_000L, 60_000L)
@@ -106,6 +105,8 @@ class Client(
     var socket: MySocket? = null) {
     var lastUpdate: Long = 0
     var isHasGpsTime = false
+    val queue = MyQueue()
+
 
     fun create() {
         val serverSocket = ServerSocket()
@@ -117,7 +118,8 @@ class Client(
                 socket?.socket?.close()
                 socket?.close()
                 try {
-                    socket = MyServerThread(serverSocket.accept(), port)
+                    socket = MySocket(serverSocket.accept(), "server")
+                    queue.attach(socket!!)
                     socket!!.addOnJson{ jo, tag ->
                         //  update
                         if (tag == JSON_TAG_UPDATE) {
@@ -125,7 +127,7 @@ class Client(
 //                            synchronized(lastUpdate) { lastUpdate[i] = jo["time"].toString().toLong() }
                             isHasGpsTime = jo["isHasGps"].toString().toBoolean()
                         }
-                        Session.tryReceiveFeedback(jo, tag, ActivityHome::showFeedback)
+                        Session.tryReceiveFeedback(jo, tag, ActivityHome::invalidateFeedback)
                     }
                     socket!!.write(JSONObject(), JSON_TAG_LAUNCH)
                     Session.log("accepted")

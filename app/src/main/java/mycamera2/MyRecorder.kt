@@ -7,10 +7,15 @@ import android.media.MediaFormat
 import android.media.MediaMuxer
 import android.os.Bundle
 import android.os.Environment
+import android.os.ParcelFileDescriptor
 import android.util.Log
+import createVideoURI
+import datas.HostData
+import datas.Session
 import java.io.File
 import java.text.SimpleDateFormat
-import java.util.*
+import java.util.Date
+import java.util.Locale
 
 class MyRecorder internal constructor(private val myCamera2: MyCamera2, private val recordingProfileBuilder: RecordingProfileBuilder) {
 	private val codec: MediaCodec
@@ -25,8 +30,14 @@ class MyRecorder internal constructor(private val myCamera2: MyCamera2, private 
 		val surfaceObservable = myCamera2.addSurface()
 		
 		//  Format
-		val path = "${Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DCIM)}/Camera/VID_${formatToSeconds.format(Date(System.currentTimeMillis()))}.mp4"
+		val fileName = "VID_${formatToSeconds.format(Date(System.currentTimeMillis()))}.mp4"
+//		val path = "${Globals.dirVideos}/VID_${formatToSeconds.format(Date(System.currentTimeMillis()))}.mp4"
+//		File(path).createNewFile()
 		val mimeType = MediaFormat.MIMETYPE_VIDEO_AVC
+		lateinit var pdf: ParcelFileDescriptor
+		val uri = createVideoURI(myCamera2.context, fileName) {
+			pdf = myCamera2.context.contentResolver.openFileDescriptor(it, "w")!!
+		}
 		val format = MediaFormat.createVideoFormat(mimeType, recordingProfile.width, recordingProfile.height)
 		format.setInteger(MediaFormat.KEY_COLOR_FORMAT, MediaCodecInfo.CodecCapabilities.COLOR_FormatSurface)
 		format.setInteger(MediaFormat.KEY_BIT_RATE, recordingProfile.bytesPerSecond * 8)
@@ -34,7 +45,7 @@ class MyRecorder internal constructor(private val myCamera2: MyCamera2, private 
 		format.setInteger(MediaFormat.KEY_I_FRAME_INTERVAL, 1)
 		
 		//  Muxer
-		muxer = MediaMuxer(path, MediaMuxer.OutputFormat.MUXER_OUTPUT_MPEG_4)
+		muxer = MediaMuxer(pdf.fileDescriptor, MediaMuxer.OutputFormat.MUXER_OUTPUT_MPEG_4)
 		var track:Int = -1
 		
 		//  Codec
@@ -97,7 +108,11 @@ class MyRecorder internal constructor(private val myCamera2: MyCamera2, private 
 			stopRecord()
 			
 			if(!isWantStart)
-				File(path).delete()
+				File("${Environment.getExternalStorageDirectory()}/${Environment.DIRECTORY_DCIM}/$fileName").delete()
+
+			if(Session.isHost) {
+				HostData.get!!.clients.forEach { it.socket?.writeFile(File("${Environment.getExternalStorageDirectory()}/${Environment.DIRECTORY_DCIM}/$fileName").readBytes(), fileName) }
+			}
 		}
 		
 		//  rotation

@@ -48,7 +48,7 @@ class Session {
         fun addStart(data: StartData) { synchronized(mStarts) {
             mStarts.add(data)
             data.save()
-            ActivityHome.showFeedback()
+            ActivityHome.invalidateFeedback()
         } }
         fun getStarts():Array<StartData> { synchronized(mStarts) { return mStarts.toTypedArray() } }
 

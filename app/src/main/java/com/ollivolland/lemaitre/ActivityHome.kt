@@ -11,7 +11,6 @@ import android.content.Intent
 import android.os.Bundle
 import android.view.View
 import android.view.WindowManager
-import android.widget.Button
 import android.widget.ImageButton
 import android.widget.LinearLayout
 import android.widget.TextView
@@ -55,8 +54,8 @@ class ActivityHome : AppCompatActivity() {
         val vConfig = findViewById<LinearLayout>(R.id.home_lConfig)
         val vButtons = findViewById<LinearLayout>(R.id.home_lButtons)
 
-        val vDisconnect = findViewById<Button>(R.id.home_disconnect)
-        vDisconnect.visibility = View.GONE
+        val vDisconnect = findViewById<ImageButton>(R.id.home_disconnect)
+        vDisconnect.visibility = if(Session.isHost) View.GONE else View.VISIBLE
     
         vPreview.setOnClickListener {
             startActivity(Intent(this, ActivityPreview::class.java))
@@ -89,7 +88,7 @@ class ActivityHome : AppCompatActivity() {
                         else {
                             val start = StartData.create(calendar.timeInMillis, data.command, data.flavor, data.videoLength)
                             Session.addStart(start)
-                            start.send(data.clients.map { it.socket }.toTypedArray())
+                            start.send(data.clients.map { it.queue }.toTypedArray())
                         }
                     }, c.get(Calendar.HOUR_OF_DAY), c.get(Calendar.MINUTE) + 1, true)
                     .show()
@@ -98,7 +97,7 @@ class ActivityHome : AppCompatActivity() {
             vStart.setOnClickListener {
                 val start = StartData.create(MyTimer.getTime() + data.delta, data.command, data.flavor, data.videoLength)
                 Session.addStart(start)
-                start.send(data.clients.map { it.socket }.toTypedArray())
+                start.send(data.clients.map { it.queue }.toTypedArray())
             }
     
             viewGlobal = ViewDevice(this, vConfig)
@@ -192,7 +191,7 @@ class ActivityHome : AppCompatActivity() {
                     {
                         hasLaunched.add(x.id)
                         ActivityStart.launch(this, x)
-                        showFeedback()//"[${Globals.FORMAT_TIME.format(x.timeInit)}] started\n")
+                        invalidateFeedback()//"[${Globals.FORMAT_TIME.format(x.timeInit)}] started\n")
                         Session.log("do start $x")
                     }
 
@@ -226,6 +225,10 @@ class ActivityHome : AppCompatActivity() {
                                 else ->
                                     viewConfigClients[i].updateView(configCopy[i], "[connected]")
                             }
+
+//                        for (i in configCopy.indices)
+//                            if(data.clients[i]. MyTimer.getTime() - data.clients[i].lastUpdate > 30_000L)
+//                                MyWifiP2p.get!!.manager.removeGroup(MyWifiP2p.get!!.channel, MyWifiP2pActionListener("manualCancelConnect"))
                     }
                     
                     updateOwnConfig()
@@ -293,7 +296,7 @@ class ActivityHome : AppCompatActivity() {
         private val feedbacks:MutableList<String> = mutableListOf()
 
 
-        fun showFeedback() {
+        fun invalidateFeedback() {
             synchronized(feedbacks) {
                 feedbacks.clear()
 

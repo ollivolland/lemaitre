@@ -1,7 +1,7 @@
 package datas
 
 import Globals
-import MySocket
+import MyQueue
 import com.ollivolland.lemaitre.ActivityHome
 import com.ollivolland.lemaitre.R
 import format
@@ -14,19 +14,27 @@ data class StartData(val id:Long, val timeInit:Long, val timeInitToCommand: Long
     val mpStarts:Array<Long> get() = mpStartsBuild.split(",").map { it.toLong() }.toTypedArray()
     val mpIds:Array<Int> get() = mpIdsBuild.split(",").map { it.toInt() }.toTypedArray()
     var commandDelay:Long? = null
+    var isReceivedAll = false
 
 
-    fun send(mySockets: Array<MySocket?>) {
-        for (x in mySockets)
-            x?.write(serialize(), JSON_TAG)
+    fun send(queues: Array<MyQueue>) {
+        val isReceived = BooleanArray(queues.size) { false }
+        for (x in queues.indices)
+            queues[x].sendJson(serialize(), JSON_TAG)
+            {
+                isReceived[x] = true
+                if(isReceived.all { it })
+                    isReceivedAll = true
+                ActivityHome.invalidateFeedback()
+            }
 
         Session.log("sent start $this")
     }
 
 
-    fun sendInfo(mySockets: Array<MySocket?>) {
-        for (x in mySockets)
-            x?.write(JSONObject().apply {
+    fun sendInfo(queues: Array<MyQueue>) {
+        for (x in queues)
+            x.sendJson(JSONObject().apply {
                 accumulate("id", id)
                 accumulate("info", serializeInfo())
             }, JSON_TAG_INFO)
@@ -57,7 +65,7 @@ data class StartData(val id:Long, val timeInit:Long, val timeInitToCommand: Long
 
 
     fun save() {
-        File(Globals.dirExternal.absolutePath + "/starts/$id.json").writeText(serialize().toString())
+        File(Globals.dirStarts.absolutePath + "/$id.json").writeText(serialize().toString())
     }
 
 
@@ -67,7 +75,7 @@ data class StartData(val id:Long, val timeInit:Long, val timeInitToCommand: Long
 
 
     fun feedback():String {
-        var s = "[${Globals.FORMAT_TIME.format(timeInit)}] start"
+        var s = "[${Globals.FORMAT_TIME.format(timeInit)}] start ${(if(isReceivedAll) "y" else "n")}"
         if(commandDelay != null)
             s += "\nshot: ${(commandDelay!! * .001).format(2)}s"
 
@@ -91,27 +99,32 @@ data class StartData(val id:Long, val timeInit:Long, val timeInitToCommand: Long
         const val JSON_TAG = "start"
         const val JSON_TAG_INFO = "start-info"
 
+
         fun create(timeStamp: Long, command:String, flavor: Long, videoLength: Long): StartData {
             val builder = Mp3Builder()
             
             when (command) {
                 HostData.COMMAND_KURZ -> {
-                    builder[R.raw.aufdieplaetze] = 0
+                    if(flavor > 0)
+                        builder[R.raw.aufdieplaetze] = 0
                     builder[R.raw.fertig, flavor] = DURATION_FERTIG_MS
                     builder[R.raw.shot_700ms, Globals.RANDOM.nextLong(1000, 2000)] = DURATION_TO_SHOT_MS
                 }
                 HostData.COMMAND_MITTEL -> {
-                    builder[R.raw.aufdieplaetze] = 0
+                    if(flavor > 0)
+                        builder[R.raw.aufdieplaetze] = 0
                     builder[R.raw.fertig, flavor] = DURATION_FERTIG_MS
                     builder[R.raw.shot_700ms, Globals.RANDOM.nextLong(1500, 3000)] = DURATION_TO_SHOT_MS
                 }
                 HostData.COMMAND_LANG -> {
-                    builder[R.raw.aufdieplaetze] = 0
+                    if(flavor > 0)
+                        builder[R.raw.aufdieplaetze] = 0
                     builder[R.raw.fertig, flavor] = DURATION_FERTIG_MS
                     builder[R.raw.shot_700ms, Globals.RANDOM.nextLong(2000, 4000)] = DURATION_TO_SHOT_MS
                 }
                 HostData.COMMAND_BIEP -> {
-                    builder[R.raw.aufdieplaetze] = 0
+                    if(flavor > 0)
+                        builder[R.raw.aufdieplaetze] = 0
                     builder[R.raw.beep_middle] = flavor
                 }
             }
@@ -151,7 +164,7 @@ data class StartData(val id:Long, val timeInit:Long, val timeInitToCommand: Long
                 start.receiveInfo(jo.optJSONObject("info"))
             }
 
-            ActivityHome.showFeedback()
+            ActivityHome.invalidateFeedback()
         }
     }
 }

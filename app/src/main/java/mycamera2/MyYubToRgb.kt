@@ -132,5 +132,17 @@ class MyYubToRgb {
                 i+=2
             }
         }
+
+
+        fun packUV(byteArr: ByteArray, size: Int) {
+            val swap = byteArr.copyOfRange(size, size + size / 2)
+            var i = size
+            val sizeYUV = size * 3 / 2
+            val sizeUV = size / 4
+            for (j in 0 until sizeUV) {
+                byteArr[i++] = swap[j]
+                byteArr[i++] = swap[sizeUV + j]
+            }
+        }
     }
 }

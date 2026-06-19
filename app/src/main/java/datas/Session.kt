@@ -1,17 +1,15 @@
 package datas
 
 import Globals
-import MySocket
 import com.ollivolland.lemaitre.ActivityHome
 import org.json.JSONObject
 import java.io.File
 
+
 class Session {
     companion object {
-        private const val JSON_TAG_FEEDBACK = "feedback"
-        
         private var mState: State = State.NONE
-        private val mStarts = Globals.dirStarts.listFiles().map { StartData.parse(JSONObject(File(it.path).readText())) }.mapNotNull { it }.sortedByDescending { it.time ?: 0 }.take(10).toMutableList()
+        private val mStarts = Globals.dirStarts.listFiles().asSequence().map { StartData.parse(JSONObject(File(it.path).readText())) }.mapNotNull { it }.sortedByDescending { it.time }.take(10).toMutableList()
         private val mLogs = mutableListOf<String>()
         private var mConfig: ConfigData = ConfigData("null")
         var config:ConfigData
@@ -24,26 +22,10 @@ class Session {
 
         fun setState(state: State) {
             synchronized(mState) {
-//                if(mState != State.NONE) throw Exception()
-                
                 mState = state
                 isHost = state == State.HOST
                 isClient = state == State.CLIENT
             }
-        }
-
-
-        fun sendFeedback(mySocket: MySocket?, string:String) {
-            mySocket?.write(JSONObject().apply {
-                accumulate("msg", string)
-            }, JSON_TAG_FEEDBACK)
-        }
-
-
-        fun tryReceiveFeedback(jo:JSONObject, tag:String, action:()->Unit) {
-            if(tag != JSON_TAG_FEEDBACK) return
-            
-            action()
         }
 
 

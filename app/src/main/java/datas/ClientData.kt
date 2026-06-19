@@ -38,9 +38,6 @@ class ClientData private constructor(val port: Int, val hostAddress:String, val 
                 socket!!.socket.connect(InetSocketAddress(hostAddress, port), 60_000)
                 queue.attach(socket!!)
                 socket!!.addOnJson { jo, tag ->
-                    Session.tryReceiveFeedback(jo, tag, ActivityHome::invalidateFeedback)
-                }
-                socket!!.addOnJson { jo, tag ->
                     println("socket received $tag")
 
                     //  launch
@@ -64,7 +61,6 @@ class ClientData private constructor(val port: Int, val hostAddress:String, val 
                     //  update
                     if (tag == HostData.JSON_TAG_UPDATE) {
                         lastUpdate = MyTimer.getTime()
-//                lastUpdate = jo["time"].toString().toLong()
                         isHasHostGps = jo["isHasGps"].toString().toBoolean()
                     }
                 }

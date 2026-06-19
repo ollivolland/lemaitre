@@ -117,6 +117,7 @@ data class StartData(val id:Long, val time:Long, val timeInitToCommand: Long, va
             for (c in cameras) {
                 val b = LayoutInflater.from(vButtons.context).inflate(R.layout.view_video, vButtons, false)
                 val bb = b.findViewById<ImageButton>(R.id.video_play)
+                bb.isEnabled = File("${Environment.getExternalStorageDirectory()}/${Environment.DIRECTORY_DCIM}/VID_${Globals.formatToSeconds.format(Date(time))}_${c}.mp4").exists()
                 bb.setOnClickListener {
                     val videoUri = "${Environment.getExternalStorageDirectory()}/${Environment.DIRECTORY_DCIM}/VID_${Globals.formatToSeconds.format(Date(time))}_${c}.mp4".toUri()
                     itemView.context.startActivity(Intent(Intent.ACTION_VIEW, videoUri).apply {

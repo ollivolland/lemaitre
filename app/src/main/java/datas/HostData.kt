@@ -8,7 +8,6 @@ import android.content.Context
 import android.widget.Spinner
 import android.widget.TextView
 import com.google.firebase.crashlytics.FirebaseCrashlytics
-import com.ollivolland.lemaitre.ActivityHome
 import com.ollivolland.lemaitre.R
 import config
 import datas.HostData.Companion.JSON_TAG_LAUNCH
@@ -129,10 +128,8 @@ class Client(
                         //  update
                         if (tag == JSON_TAG_UPDATE) {
                             lastUpdate = MyTimer.getTime()
-//                            synchronized(lastUpdate) { lastUpdate[i] = jo["time"].toString().toLong() }
                             isHasGpsTime = jo["isHasGps"].toString().toBoolean()
                         }
-                        Session.tryReceiveFeedback(jo, tag, ActivityHome::invalidateFeedback)
                     }
                     socket!!.write(JSONObject(), JSON_TAG_LAUNCH)
                     Session.log("accepted")

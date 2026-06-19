@@ -206,7 +206,7 @@ class ActivityHome : AppCompatActivity() {
                     {
                         hasLaunched.add(x.id)
                         ActivityStart.launch(this, x)
-                        invalidateFeedback()//"[${Globals.FORMAT_TIME.format(x.timeInit)}] started\n")
+                        invalidateFeedback()
                         Session.log("do start $x")
                     }
 

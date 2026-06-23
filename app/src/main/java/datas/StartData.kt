@@ -31,7 +31,7 @@ data class StartData(val id:Long, val time:Long, val timeInitToCommand: Long, va
         isReceivedAll = queues.isEmpty()
         val isReceived = BooleanArray(queues.size) { false }
         for (x in queues.indices)
-            queues[x].sendJson(serialize(), JSON_TAG)
+            queues[x].sendJson(serialize(), TAG_START)
             {
                 isReceived[x] = true
                 if(isReceived.all { it })
@@ -49,7 +49,7 @@ data class StartData(val id:Long, val time:Long, val timeInitToCommand: Long, va
             x.sendJson(JSONObject().apply {
                 put("id", id)
                 put("info", serializeInfo())
-            }, JSON_TAG_INFO)
+            }, TAG_START_INFO)
 
         Session.log("sent start-info $this")
     }
@@ -117,13 +117,31 @@ data class StartData(val id:Long, val time:Long, val timeInitToCommand: Long, va
             for (c in cameras) {
                 val b = LayoutInflater.from(vButtons.context).inflate(R.layout.view_video, vButtons, false)
                 val bb = b.findViewById<ImageButton>(R.id.video_play)
-                bb.isEnabled = File("${Environment.getExternalStorageDirectory()}/${Environment.DIRECTORY_DCIM}/VID_${Globals.formatToSeconds.format(Date(time))}_${c}.mp4").exists()
-                bb.setOnClickListener {
-                    val videoUri = "${Environment.getExternalStorageDirectory()}/${Environment.DIRECTORY_DCIM}/VID_${Globals.formatToSeconds.format(Date(time))}_${c}.mp4".toUri()
-                    itemView.context.startActivity(Intent(Intent.ACTION_VIEW, videoUri).apply {
-                        setDataAndType(videoUri, "video/mp4")
-                        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                    })
+                val fileName = "VID_${Globals.formatToSeconds.format(Date(time))}_${c}.mp4"
+                val isFileExists = File("${Environment.getExternalStorageDirectory()}/${Environment.DIRECTORY_DCIM}/VID_${Globals.formatToSeconds.format(Date(time))}_${c}.mp4").exists()
+                if(!isFileExists && c == Globals.deviceFingerprint)
+                    continue
+
+                bb.tooltipText = c
+                if(isFileExists) {
+                    bb.setImageResource(R.drawable.outline_play_48)
+                    bb.setOnClickListener {
+                        val videoUri = "${Environment.getExternalStorageDirectory()}/${Environment.DIRECTORY_DCIM}/VID_${Globals.formatToSeconds.format(Date(time))}_${c}.mp4".toUri()
+                        itemView.context.startActivity(Intent(Intent.ACTION_VIEW, videoUri).apply {
+                            setDataAndType(videoUri, "video/mp4")
+                            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                        })
+                    }
+                }
+                else {
+                    bb.setImageResource(R.drawable.sharp_restart_alt_24)
+                    bb.setOnClickListener {
+                        if(Session.isHost)
+                            HostData.get!!.clients.forEach { it.queue.sendJson(JSONObject().apply { put(HostData.KEY_REQUEST_FILE_PATH, fileName) }, HostData.TAG_REQUEST_FILE) }
+                        else
+                            ClientData.get!!.queue.sendJson(JSONObject().apply { put(HostData.KEY_REQUEST_FILE_PATH, fileName) }, HostData.TAG_REQUEST_FILE)
+                        bb.isEnabled = false
+                    }
                 }
                 vButtons.addView(b)
             }
@@ -137,8 +155,38 @@ data class StartData(val id:Long, val time:Long, val timeInitToCommand: Long, va
     companion object {
         private const val DURATION_FERTIG_MS:Long = 150     //  duration of "f"
         private const val DURATION_TO_SHOT_MS:Long = 20
-        const val JSON_TAG = "start"
-        const val JSON_TAG_INFO = "start-info"
+        const val TAG_START = "start"
+        const val TAG_START_INFO = "start-info"
+
+
+        fun writeFileFromDCIM(path:String, fileName: String) {
+            if(Session.isHost) {
+                HostData.get!!.clients.forEach { it.socket?.writeFile(File(path).readBytes(), fileName) }
+            } else {
+                ClientData.get!!.socket?.writeFile(File(path).readBytes(), fileName)
+            }
+            ActivityHome.invalidateFeedback()
+        }
+
+
+        fun tryReceiveFileRequest(carrier: JSONObject?) {
+            val jo = carrier?.optJSONObject(HostData.TAG_REQUEST_FILE) ?: return
+
+            Session.log("received File request")
+            val fileName = jo.optString(HostData.KEY_REQUEST_FILE_PATH, "")
+            if(fileName == "")
+                return
+
+            var path = Globals.dirAppStorage.absolutePath + "/" + fileName
+            if(path.contains(".mp4"))
+                path = Globals.dirDCIM.absolutePath + "/" + fileName
+            if(!File(path).exists()) {
+                Session.log("requested File not found $path")
+                return
+            }
+
+            writeFileFromDCIM(path, fileName)
+        }
 
 
         fun create(timeStamp: Long, command:String, flavor: Long, videoLength: Long): StartData {
@@ -178,27 +226,30 @@ data class StartData(val id:Long, val time:Long, val timeInitToCommand: Long, va
         }
 
 
-        fun parse(jo:JSONObject): StartData? {
+        fun parse(jo:JSONObject?, configData: ConfigData = ConfigData("", false)): StartData? {
+            if(jo == null)
+                return null
+
             val start = StartData(
                 jo.getLong("id"),
                 jo.getLong("timeStamp"),
                 jo.getLong("commandLength"),
                 jo.getLong("videoLength"),
                 jo["mpStarts"].toString(),
-                jo["mps"].toString(), ConfigData("", false)
+                jo["mps"].toString(), configData
             )
             start.receiveInfo(jo.optJSONObject("info"))
             return start
         }
 
 
-        fun tryReceive(jo:JSONObject, tag:String) {
-            if(tag == JSON_TAG) {
-                val start = parse(jo)!!
+        fun tryReceive(carrier:JSONObject) {
+            parse(carrier.optJSONObject(TAG_START), Session.config.copy())?.also { start ->
                 Session.addStart(start)
                 Session.log("received start $start")
             }
-            if(tag == JSON_TAG_INFO) {
+
+            carrier.optJSONObject(TAG_START_INFO)?.also { jo ->
                 val id = jo.getLong("id")
                 val start = Session.getStarts().firstOrNull { it.id == id }
                 if(start == null)

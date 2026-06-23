@@ -103,13 +103,14 @@ class ConfigData(val deviceName:String, private val isHost:Boolean = false) {
         val QUALITY_DESCRIPTIONS = arrayOf("1080p", "1440p", "2160p")
         const val JSON_TAG = "config"
 
-        fun tryReceive(jo:JSONObject, tag:String, deviceName: String) {
-            if(tag != JSON_TAG) return
-            
+
+        fun tryReceive(carrier:JSONObject, deviceName: String) {
+            val jo = carrier.optJSONObject(JSON_TAG) ?: return
+
             Session.config = ConfigData(deviceName).apply {
-                isCommand = jo["isCommand"] as Boolean
-                isCamera = jo["isCamera"] as Boolean
-                isGate = jo["isGate"] as Boolean
+                isCommand = jo.getBoolean("isCommand")
+                isCamera = jo.getBoolean("isCamera")
+                isGate = jo.getBoolean("isGate")
                 fps = jo["fps"] as Int
                 quality = jo["quality"] as Int
             }

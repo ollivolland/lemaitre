@@ -40,6 +40,7 @@ class ActivityHome : AppCompatActivity() {
     private val socketReadListeners = mutableListOf<Pair<MySocket, Int>>()
     private var isRunning = true
     private var isDialogsFinished = false
+    private var isFirstResume = true
 
 
     @SuppressLint("MissingPermission")
@@ -243,7 +244,7 @@ class ActivityHome : AppCompatActivity() {
                                     viewConfigClients[i].updateView(configCopy[i], "[connected]")
                             }
                     }
-                    
+
                     updateOwnConfig()
                 }
             }
@@ -257,6 +258,21 @@ class ActivityHome : AppCompatActivity() {
 //        MyWifiP2p.get?.close()
         
         for(x in socketReadListeners) x.first.removeOnJson(x.second)
+    }
+
+
+    override fun onStart() {
+        super.onStart()
+
+        if (isFirstResume) {
+            isFirstResume = false
+            return
+        }
+
+        if(Session.isClient) {
+            ClientData.get?.replaceSocket()
+            Session.log("ActivityHome resumed => replaced")
+        }
     }
 
 
@@ -286,14 +302,14 @@ class ActivityHome : AppCompatActivity() {
                 else ->
                     viewConfigMe.updateView(Session.config, "[connected]")
             }
-        
+
         vPreview.visibility = if(Session.config.isCamera || Session.config.isGate) View.VISIBLE else View.GONE
     }
 
 
     companion object {
         const val TIME_START = 3_000L
-        const val TIME_CONNECTION_TIMEOUT = 3_000L
+        const val TIME_CONNECTION_TIMEOUT = 5_000L
         private var starts: Array<StartData> = Session.getStarts()
         private var isDataUpdated = true
 

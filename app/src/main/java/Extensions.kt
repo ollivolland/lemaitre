@@ -30,7 +30,7 @@ fun TextView.setString(text:String) {
 fun Double.format(digits: Int) = "%.${digits}f".format(this).replace(',', '.')
 
 
-fun createVideoURI(context: Context, displayName: String, f:(Uri)-> Unit): Uri {
+fun createVideoURI(context: Context, displayName: String): Uri {
     val values = ContentValues().apply {
         put(MediaStore.MediaColumns.DISPLAY_NAME, displayName)
         put(MediaStore.MediaColumns.MIME_TYPE, "video/mp4")
@@ -42,7 +42,6 @@ fun createVideoURI(context: Context, displayName: String, f:(Uri)-> Unit): Uri {
 
     try {
         uri = resolver.insert(MediaStore.Video.Media.EXTERNAL_CONTENT_URI, values) ?: throw IOException("Failed to create new MediaStore record.")
-        f(uri)
         return uri
     } catch (e: IOException) {
         uri?.let { orphanUri ->
@@ -52,3 +51,18 @@ fun createVideoURI(context: Context, displayName: String, f:(Uri)-> Unit): Uri {
         throw e
     }
 }
+
+//fun decodeUri(context: Context, uri: Uri): String {
+//    try {
+//        // Open the document asset using read-only mode ("r")
+//        context.contentResolver.openFileDescriptor(uri, "r")?.use { pfd ->
+//
+//            // Detach the native FD (transfers ownership of the FD to you)
+//            val fileDescriptor: Int = pfd.detachFd()
+//
+//            return fileDescriptor
+//        }
+//    } catch (e: Exception) {
+//        e.printStackTrace()
+//    }
+//}

@@ -2,6 +2,7 @@ package datas
 
 import Globals
 import com.ollivolland.lemaitre.ActivityHome
+import com.ollivolland.lemaitre.MyApp
 import org.json.JSONObject
 import java.io.File
 
@@ -40,6 +41,10 @@ class Session {
         fun log(string: String) {
             println(string)
             synchronized(mLogs) { mLogs.add(string) }
+
+            val time = System.currentTimeMillis()
+            File("${Globals.dirLogs.absolutePath}/log-${Globals.FORMAT_DAY_FILE.format(time)}.txt")
+                .appendText("\n\n${Globals.FORMAT_LOGCAT.format(time)} ${android.os.Process.myPid()}-${android.os.Process.myTid()} TAG ${MyApp.packageName} V \n\t$string")
         }
         fun getLogs():Array<String> { synchronized(mLogs) { return mLogs.toTypedArray() } }
     }

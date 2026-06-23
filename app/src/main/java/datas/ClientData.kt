@@ -7,6 +7,7 @@ import android.content.Intent
 import com.google.firebase.crashlytics.FirebaseCrashlytics
 import com.ollivolland.lemaitre.ActivityHome
 import com.ollivolland.lemaitre.MainActivity
+import datas.StartData.Companion.tryReceiveFileRequest
 import org.json.JSONObject
 import java.net.InetSocketAddress
 import java.net.Socket
@@ -37,11 +38,9 @@ class ClientData private constructor(val port: Int, val hostAddress:String, val 
             try {
                 socket!!.socket.connect(InetSocketAddress(hostAddress, port), 60_000)
                 queue.attach(socket!!)
-                socket!!.addOnJson { jo, tag ->
-                    println("socket received $tag")
-
+                socket!!.addOnJson { carrier ->
                     //  launch
-                    if (mainActivity != null && tag == HostData.JSON_TAG_LAUNCH) {
+                    carrier.optJSONObject(HostData.JSON_TAG_LAUNCH)?.also {
                         mainActivity?.startActivity(
                             Intent(
                                 mainActivity,
@@ -52,17 +51,19 @@ class ClientData private constructor(val port: Int, val hostAddress:String, val 
                         mainActivity = null
                     }
 
-                    //  config
-                    ConfigData.tryReceive(jo, tag, deviceName)
-
-                    //  start
-                    StartData.tryReceive(jo, tag)
+                    //  config, start, file
+                    ConfigData.tryReceive(carrier, deviceName)
+                    StartData.tryReceive(carrier)
+                    tryReceiveFileRequest(carrier)
 
                     //  update
-                    if (tag == HostData.JSON_TAG_UPDATE) {
+                    carrier.optJSONObject(HostData.JSON_TAG_UPDATE)?.also { jo ->
                         lastUpdate = MyTimer.getTime()
                         isHasHostGps = jo["isHasGps"].toString().toBoolean()
                     }
+                }
+                socket!!.myOnFileReceivedListeners.add { fName ->
+                    ActivityHome.invalidateFeedback()
                 }
 
                 //  client update host

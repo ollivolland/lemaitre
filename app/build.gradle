@@ -33,6 +33,8 @@ android {
 }
 
 dependencies {
+    implementation 'androidx.activity:activity-ktx:1.8.0'
+    implementation 'androidx.constraintlayout:constraintlayout:2.1.4'
     implementation 'androidx.core:core-ktx:1.7.0'   //  don't upgrade, may cause duplicateClassException
     implementation 'androidx.appcompat:appcompat:1.4.1'
     implementation 'com.google.android.material:material:1.8.0'
@@ -47,6 +49,8 @@ dependencies {
 //
 //    implementation 'com.quickbirdstudios:opencv:3.4.1'
     implementation "org.opencv:opencv:4.10.0"
+
+    implementation "com.github.chrisbanes:PhotoView:2.3.0"
 
 
 //    testImplementation 'junit:junit:4.13.2'

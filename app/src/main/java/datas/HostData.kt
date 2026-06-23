@@ -1,5 +1,6 @@
 package datas
 
+import Globals
 import MyQueue
 import MySocket
 import MyTimer
@@ -8,12 +9,17 @@ import android.content.Context
 import android.widget.Spinner
 import android.widget.TextView
 import com.google.firebase.crashlytics.FirebaseCrashlytics
+import com.ollivolland.lemaitre.ActivityHome
+import com.ollivolland.lemaitre.MyApp
 import com.ollivolland.lemaitre.R
 import config
+import createVideoURI
 import datas.HostData.Companion.JSON_TAG_LAUNCH
 import datas.HostData.Companion.JSON_TAG_UPDATE
+import datas.StartData.Companion.tryReceiveFileRequest
 import org.json.JSONObject
 import setString
+import java.io.File
 import java.net.InetSocketAddress
 import java.net.ServerSocket
 import kotlin.concurrent.thread
@@ -67,9 +73,11 @@ class HostData private constructor(val hostName:String, val clients: Array<Clien
     }
 
     companion object {
+        const val TAG_REQUEST_FILE = "request-file"
+        const val KEY_REQUEST_FILE_PATH = "request-file-path"
         const val JSON_TAG_UPDATE = "update"
         const val JSON_TAG_LAUNCH = "fin"
-        
+
         const val COMMAND_KURZ = "kKurz"
         const val COMMAND_MITTEL = "kMittel"
         const val COMMAND_LANG = "kLang"
@@ -100,7 +108,7 @@ class HostData private constructor(val hostName:String, val clients: Array<Clien
 
 class Client(
     val ip:String,
-    val wifiP2pName:String,   //  set to ip
+    val wifiP2pName:String,
     val port:Int,
     val humanName:String,
     val fingerprint:String,
@@ -116,26 +124,39 @@ class Client(
         val serverSocket = ServerSocket()
         serverSocket.reuseAddress = true
         serverSocket.bind(InetSocketAddress(port))
+
         thread {
             while (true) {
                 Session.log("[$port] waiting")
-                socket?.socket?.close()
-                socket?.close()
+                var prev = socket
                 try {
                     socket = MySocket(serverSocket.accept(), "server")
-                    queue.attach(socket!!)
-                    socket!!.addOnJson{ jo, tag ->
-                        //  update
-                        if (tag == JSON_TAG_UPDATE) {
-                            lastUpdate = MyTimer.getTime()
-                            isHasGpsTime = jo["isHasGps"].toString().toBoolean()
+                    thread {
+                        prev?.socket?.close()
+                        prev?.close()
+                        queue.attach(socket!!)
+                        socket!!.addOnJson { carrier ->
+                            //  update
+                            carrier.optJSONObject(JSON_TAG_UPDATE)?.also { jo ->
+                                lastUpdate = MyTimer.getTime()
+                                isHasGpsTime = jo["isHasGps"].toString().toBoolean()
+                            }
+
+                            tryReceiveFileRequest(carrier)
                         }
+                        socket!!.myOnFileReceivedListeners.add { fName ->
+                            var path = Globals.dirAppStorage.absolutePath + "/" + fName
+                            if (path.contains(".mp4"))
+                                path = createVideoURI(MyApp.appContext, fName).path!!
+                            HostData.get!!.clients.filterNot { it.fingerprint == fingerprint }.forEach { it.socket?.writeFile(File(path).readBytes(), fName) }
+                            ActivityHome.invalidateFeedback()
+                        }
+                        socket!!.write(JSONObject(), JSON_TAG_LAUNCH)
+                        Session.log("accepted")
+                        socket!!.setSocketConfigured()
                     }
-                    socket!!.write(JSONObject(), JSON_TAG_LAUNCH)
-                    Session.log("accepted")
-                    socket!!.setSocketConfigured()
                 } catch (e: Exception) {
-                    Session.log("reconnection crashed")
+                    Session.log("connection crashed")
                     println(e.printStackTrace())
                     FirebaseCrashlytics.getInstance().recordException(e)
                 }

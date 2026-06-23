@@ -11,9 +11,7 @@ import android.os.Environment
 import android.os.ParcelFileDescriptor
 import android.util.Log
 import createVideoURI
-import datas.ClientData
-import datas.HostData
-import datas.Session
+import datas.StartData
 import java.io.File
 import java.util.Date
 
@@ -33,10 +31,7 @@ class MyRecorder internal constructor(private val myCamera2: MyCamera2, private 
 		//  Format
 		val fileName = "VID_${Globals.formatToSeconds.format(Date(ts))}_${Globals.deviceFingerprint}.mp4"
 		val mimeType = MediaFormat.MIMETYPE_VIDEO_AVC
-		lateinit var pdf: ParcelFileDescriptor
-		createVideoURI(myCamera2.context, fileName) {
-			pdf = myCamera2.context.contentResolver.openFileDescriptor(it, "w")!!
-		}
+		val pdf: ParcelFileDescriptor = myCamera2.context.contentResolver.openFileDescriptor(createVideoURI(myCamera2.context, fileName), "w")!!
 		val format = MediaFormat.createVideoFormat(mimeType, recordingProfile.width, recordingProfile.height)
 		format.setInteger(MediaFormat.KEY_COLOR_FORMAT, MediaCodecInfo.CodecCapabilities.COLOR_FormatSurface)
 		format.setInteger(MediaFormat.KEY_BIT_RATE, recordingProfile.bytesPerSecond * 8)
@@ -108,12 +103,8 @@ class MyRecorder internal constructor(private val myCamera2: MyCamera2, private 
 			
 			if(!isWantStart)
 				File("${Environment.getExternalStorageDirectory()}/${Environment.DIRECTORY_DCIM}/$fileName").delete()
-
-			if(Session.isHost) {
-				HostData.get!!.clients.forEach { it.socket?.writeFile(File("${Environment.getExternalStorageDirectory()}/${Environment.DIRECTORY_DCIM}/$fileName").readBytes(), fileName) }
-			} else {
-				ClientData.get!!.socket?.writeFile(File("${Environment.getExternalStorageDirectory()}/${Environment.DIRECTORY_DCIM}/$fileName").readBytes(), fileName)
-			}
+			else
+				StartData.writeFileFromDCIM("${Environment.getExternalStorageDirectory()}/${Environment.DIRECTORY_DCIM}/$fileName", fileName)
 		}
 		
 		//  rotation

@@ -35,16 +35,12 @@ class MainActivity : Activity() {
     //  todo    CRASHES CAUSE of gps permisson
     //  todo    check if cam profile is available
     //  todo    video timestamp
-    //  todo    display images
     //  todo    stop start on all devices
     //  todo    dialog spinner info
-    //  todo    separate home warnings and errors
-    //  todo    home disable buttons on error
     //  todo    display storage space
-
-    //  todo    hard logs
-
-    //  big
+    //  todo    Filesharing with uri/path instead of filename
+    //  todo    perspective
+    //  todo    move frame
     //  todo    audioTrack instead of MediaPlayer   https://stackoverflow.com/questions/12263671/audiotrack-android-playing-sounds-from-raw-folder
 
     //  BUGS
@@ -79,8 +75,13 @@ class MainActivity : Activity() {
         if (toGrant.isNotEmpty()) requestPermissions(toGrant, 1)
         
         //  files
-        if(!Globals.dirStarts.exists())
-            Globals.dirStarts.mkdir()
+        for (x in arrayOf(Globals.dirStarts, Globals.dirLogs))
+            if(!x.exists())
+                x.mkdir()
+
+        for (x in arrayOf("${Globals.dirLogs.absolutePath}/log-${Globals.FORMAT_DAY_FILE.format(System.currentTimeMillis())}.txt"))
+            if(!File(x).exists())
+                File(x).createNewFile()
 
         val dir = getExternalFilesDir(null)
         if(!File("$dir\\$PATH_SENSITIVITY").exists())
@@ -147,11 +148,6 @@ class MainActivity : Activity() {
                 Thread.sleep(20)
             }
         }
-
-        //  Todo
-//        thread {
-//            Velocity.extract(this, Globals.dirDownload.absolutePath + "/velocity-test-4.mp4")
-//        }
     }
 
 

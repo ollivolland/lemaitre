@@ -5,7 +5,7 @@ import MySocket
 import MyWifiP2p
 import MyWifiP2p.Companion.JSON_KEY_PORT
 import MyWifiP2p.Companion.JSON_TAG_CLIENT_REPLY
-import MyWifiP2p.Companion.JSON_TAG_CONFIG
+import MyWifiP2p.Companion.TAG_CONFIG_CLIENT
 import MyWifiP2pActionListener
 import android.Manifest
 import android.annotation.SuppressLint
@@ -113,25 +113,25 @@ class MyConnectionManager(private val activity: MainActivity) {
                         ip = it.inetAddress.hostAddress!!
 
                         this.write(JSONObject().apply {
-                            accumulate(JSON_KEY_PORT, port)
-                        }, JSON_TAG_CONFIG)
+                            put(JSON_KEY_PORT, port)
+                        }, TAG_CONFIG_CLIENT)
                     }
-                    addOnJson { jo, tag ->
-                        if (tag != JSON_TAG_CLIENT_REPLY) return@addOnJson
+                    addOnJson { carrier ->
+                        carrier.optJSONObject(JSON_TAG_CLIENT_REPLY)?.also { jo ->
+                            val client = Client(
+                                ip,
+                                jo.getString(JSON_KEY_P2P_NAME),
+                                port,
+                                jo.getString(JSON_KEY_DEVICE_NAME),
+                                jo.getString(JSON_KEY_FINGERPRINT),
+                                jo.getString(JSON_KEY_P2P_ADDRESS),
+                            )
+                            client.create()
+                            clients.add(client)
+                            Session.log("client ${client.humanName} on [$port] => $ip")
 
-                        val client = Client(
-                            ip,
-                            jo.getString(JSON_KEY_P2P_NAME),
-                            port,
-                            jo.getString(JSON_KEY_DEVICE_NAME),
-                            jo.getString(JSON_KEY_FINGERPRINT),
-                            jo.getString(JSON_KEY_P2P_ADDRESS),
-                        )
-                        client.create()
-                        clients.add(client)
-                        Session.log("client ${client.humanName} on [$port] => $ip")
-
-                        this.close()
+                            this.close()
+                        }
                     }
                     setSocketConfigured()
                 }
@@ -144,27 +144,26 @@ class MyConnectionManager(private val activity: MainActivity) {
         thread {
             val socket = Socket()
             mySocketFormation = MySocket(socket, "client").apply {
-                addOnJson { jo, tag ->
-                    if (tag != JSON_TAG_CONFIG) return@addOnJson
+                addOnJson { carrier ->
+                    carrier.optJSONObject(TAG_CONFIG_CLIENT)?.also { jo ->
+                        this.write(JSONObject().apply {
+                            put(JSON_KEY_DEVICE_NAME, Globals.deviceName)
+                            put(JSON_KEY_P2P_NAME, myWifiP2p.deviceName)
+                            put(JSON_KEY_P2P_ADDRESS, myWifiP2p.deviceAddress)
+                            put(JSON_KEY_FINGERPRINT, Globals.deviceFingerprint)
+                        }, JSON_TAG_CLIENT_REPLY)
 
-                    this.write(JSONObject().apply {
-                        put(JSON_KEY_DEVICE_NAME, Globals.deviceName)
-                        put(JSON_KEY_P2P_NAME, myWifiP2p.deviceName)
-                        put(JSON_KEY_P2P_ADDRESS, myWifiP2p.deviceAddress)
-                        put(JSON_KEY_FINGERPRINT, Globals.deviceFingerprint)
-                    }, JSON_TAG_CLIENT_REPLY)
+                        ClientData.set(
+                            jo.getInt(JSON_KEY_PORT),
+                            info.groupOwnerAddress.hostAddress!!,
+                            Globals.deviceName,
+                            activity
+                        )
+                        Session.log("host = ${ClientData.get!!.port}")
 
-                    ClientData.set(
-                        jo[JSON_KEY_PORT] as Int,
-                        info.groupOwnerAddress.hostAddress!!,
-                        Globals.deviceName,
-                        activity
-                    )
-                    Session.log("host = ${ClientData.get!!.port}")
-
-                    this.close()
-
-                    finish()
+                        this.close()
+                        finish()
+                    }
                 }
             }
             socket.connect(InetSocketAddress(info.groupOwnerAddress.hostAddress!!, MainActivity.PORT_FORMATION), 60_000)

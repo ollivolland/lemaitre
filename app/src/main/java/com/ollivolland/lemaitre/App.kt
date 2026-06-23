@@ -7,10 +7,13 @@ class MyApp: Application() {
 	override fun onCreate() {
 		super.onCreate()
 		appContext = applicationContext
+		Companion.packageName = appContext.packageName
 	}
 	
 	companion object {
 		lateinit var appContext: Context
+			private set
+		lateinit var packageName: String
 			private set
 	}
 }

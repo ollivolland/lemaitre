@@ -146,7 +146,7 @@ class MyWifiP2p(private val activity: MainActivity, private val mConnectionInfoL
 	}
 	
 	companion object {
-		const val JSON_TAG_CONFIG = "wifip2pconfig"
+		const val TAG_CONFIG_CLIENT = "wifip2pconfig"
 		const val JSON_TAG_CLIENT_REPLY = "wifip2preply"
 		const val JSON_KEY_PORT = "useport"
 

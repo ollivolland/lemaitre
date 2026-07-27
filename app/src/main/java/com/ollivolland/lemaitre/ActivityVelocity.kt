@@ -49,8 +49,10 @@ class ActivityVelocity : Activity() {
     lateinit var toucher: View
     var p:Perspective = Perspective()
     var iDisplay = -1
+    var iDisplayed = -1
     var iLast = 0
     var send:(()-> Unit)? = null
+    var isMarkersLocked = false
 
 
     @SuppressLint("ClickableViewAccessibility")
@@ -71,10 +73,6 @@ class ActivityVelocity : Activity() {
             iDisplay = (iDisplay-60).coerceIn(-2, iLast-1)
             send?.invoke()
         }
-//        findViewById<ImageButton>(R.id.velocity_b2).setOnClickListener {
-//            iDisplay = (iDisplay-1).coerceIn(-2, iLast-1)
-//            send?.invoke()
-//        }
         var b2Runnable: Thread? = null
         findViewById<ImageButton>(R.id.velocity_b2).setOnTouchListener { v,ev ->
             when (ev.action) {
@@ -138,8 +136,8 @@ class ActivityVelocity : Activity() {
             send?.invoke()
         }
         findViewById<ImageButton>(R.id.velocity_lock).setOnClickListener {
-            iDisplay = -2
-            send?.invoke()
+            isMarkersLocked = !isMarkersLocked
+            invalidateInfos("Markers ${(if(isMarkersLocked) "locked" else "unlocked")}")
         }
 
         image.maximumScale = 100f
@@ -219,6 +217,7 @@ class ActivityVelocity : Activity() {
 //        zoomerimage.getDisplayMatrix(zoomerBaseMatrixInverse)
 //        zoomerBaseMatrixInverse.invert(zoomerBaseMatrixInverse)
         zoomerLayout.visibility = View.GONE
+        val attacher = PhotoViewAttacher(image)
 
         fun send1() {
             val matUse = Mat()
@@ -226,7 +225,8 @@ class ActivityVelocity : Activity() {
             if(iDisplay == -1)
                 matAverage.copyTo(matUse)
             else if(iDisplay == -2) {
-                bmpFrame = retriever.getFrameAtIndex(350)
+                if(iDisplayed != iDisplay)
+                    bmpFrame = retriever.getFrameAtIndex(350)
                 Utils.bitmapToMat(bmpFrame, matUse)
                 Core.rotate(matUse, matUse, Core.ROTATE_90_COUNTERCLOCKWISE)
                 Imgproc.GaussianBlur(matUse, matUse, kernelSize, 0.0)
@@ -263,7 +263,8 @@ class ActivityVelocity : Activity() {
                 )
             }
             else {
-                bmpFrame = retriever.getFrameAtIndex(iDisplay)
+                if(iDisplayed != iDisplay)
+                    bmpFrame = retriever.getFrameAtIndex(iDisplay)
                 Utils.bitmapToMat(bmpFrame, matUse)
                 Core.rotate(matUse, matUse, Core.ROTATE_90_COUNTERCLOCKWISE)
                 runOnUiThread { textDesc.text = "f=$iDisplay at ${"%.3f".format(times[iDisplay] * 1E-6)}s" }
@@ -275,13 +276,18 @@ class ActivityVelocity : Activity() {
             }
 
             Utils.matToBitmap(matUse, bmpImage)
-            runOnUiThread { image.setImageBitmap(bmpImage) }
+            runOnUiThread {
+                val imageDisplayMatrix = Matrix()
+                attacher.getSuppMatrix(imageDisplayMatrix)
+                image.setImageBitmap(bmpImage)
+                attacher.setDisplayMatrix(imageDisplayMatrix)
+            }
             matUse.release()
+            iDisplayed = iDisplay
         }
         this.send = { send1() }
         send1()
 
-        val attacher = PhotoViewAttacher(image)
         attacher.maximumScale = 20f
         val imageDisplayMatrix = Matrix()
         fun inverse(v:Vec<Int>):Vec<Int> {
@@ -305,7 +311,7 @@ class ActivityVelocity : Activity() {
             override fun onDoubleTap(p0: MotionEvent): Boolean {
                 val v = inverse(Vec.create(p0.x.toInt(), p0.y.toInt()))
                 val selectedMarker = p.markerPositions.indices.firstOrNull { (p.markerPositions[it] - v).ls<Int>() < 100*100 } ?: -1
-                if(selectedMarker >= 1) {
+                if(!isMarkersLocked && selectedMarker >= 1) {
                     val taskEditText = EditText(layout.context)
                     val dialog = AlertDialog.Builder(layout.context)
                         .setTitle("Change Distance?")
@@ -321,8 +327,10 @@ class ActivityVelocity : Activity() {
                         }
                         .setNegativeButton("Cancel", null)
                         .create().show()
+                } else {
+                    invalidateInfos("${"%.2f".format(p.getDistance(v))}m at ${"%.3f".format(times[iDisplay] * 1E-6)}s")// = ${"%.2f".formatV(p)}"
                 }
-                invalidateInfos("onDoubleTap ${v} ${p.getDistance(v)} ${p.getPixelAtPositionF(p.getDistance(v))}")
+//                invalidateInfos("onDoubleTap ${v} ${p.getDistance(v)} ${p.getPixelAtPositionF(p.getDistance(v))}")
                 return false
             }
 
@@ -344,6 +352,7 @@ class ActivityVelocity : Activity() {
             if(ev.action == MotionEvent.ACTION_DOWN) {
                 val v = inverse(Vec.create(ev.x.toInt(), ev.y.toInt()))
                 selectedMarker = p.markerPositions.indices.firstOrNull { (p.markerPositions[it] - v).ls<Int>() < 50*50 } ?: -1
+                if (isMarkersLocked) selectedMarker = -1
                 if(selectedMarker >= 0) {
                     invalidateInfos("down $v ${p.markerPositions[selectedMarker]} [$selectedMarker]")
                     attacher.getSuppMatrix(imageDisplayMatrix)
@@ -352,9 +361,6 @@ class ActivityVelocity : Activity() {
                     attacher.setDisplayMatrix(imageDisplayMatrix)
 
                     zoomerLayout.visibility = View.VISIBLE
-                }
-                else {
-                    invalidateInfos("down ${"%.2f".format(p.getDistance(v))} m")// = ${"%.2f".formatV(p)}"
                 }
             }
 

@@ -9,7 +9,6 @@ import android.net.wifi.p2p.WifiP2pConfig
 import android.net.wifi.p2p.WifiP2pDevice
 import android.net.wifi.p2p.WifiP2pManager
 import com.ollivolland.lemaitre.MainActivity
-import com.ollivolland.lemaitre.MyNSD
 import datas.Session
 import kotlin.concurrent.thread
 

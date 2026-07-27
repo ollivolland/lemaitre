@@ -2,6 +2,7 @@ package com.ollivolland.lemaitre
 
 import Globals
 import GpsTime
+import MyConnectionManager
 import android.Manifest
 import android.annotation.SuppressLint
 import android.app.Activity

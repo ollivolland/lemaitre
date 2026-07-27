@@ -1,12 +1,6 @@
-package com.ollivolland.lemaitre
-
-import Globals
-import MySocket
-import MyWifiP2p
 import MyWifiP2p.Companion.JSON_KEY_PORT
 import MyWifiP2p.Companion.JSON_TAG_CLIENT_REPLY
 import MyWifiP2p.Companion.TAG_CONFIG_CLIENT
-import MyWifiP2pActionListener
 import android.Manifest
 import android.annotation.SuppressLint
 import android.net.wifi.WpsInfo
@@ -15,6 +9,7 @@ import android.net.wifi.p2p.WifiP2pDevice
 import android.net.wifi.p2p.WifiP2pInfo
 import android.net.wifi.p2p.WifiP2pManager
 import androidx.annotation.RequiresPermission
+import com.ollivolland.lemaitre.MainActivity
 import datas.Client
 import datas.ClientData
 import datas.HostData

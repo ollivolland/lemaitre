@@ -1,11 +1,8 @@
-package com.ollivolland.lemaitre
-
-import MyWifiP2p
-import MyWifiP2pActionListener
 import android.annotation.SuppressLint
 import android.net.wifi.p2p.WifiP2pDevice
 import android.net.wifi.p2p.nsd.WifiP2pDnsSdServiceInfo
 import android.net.wifi.p2p.nsd.WifiP2pDnsSdServiceRequest
+import com.ollivolland.lemaitre.MainActivity
 import datas.Session
 import kotlin.concurrent.thread
 

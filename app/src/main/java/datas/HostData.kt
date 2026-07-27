@@ -1,6 +1,5 @@
 package datas
 
-import Globals
 import MyQueue
 import MySocket
 import MyTimer
@@ -10,10 +9,8 @@ import android.widget.Spinner
 import android.widget.TextView
 import com.google.firebase.crashlytics.FirebaseCrashlytics
 import com.ollivolland.lemaitre.ActivityHome
-import com.ollivolland.lemaitre.MyApp
 import com.ollivolland.lemaitre.R
 import config
-import createVideoURI
 import datas.HostData.Companion.JSON_TAG_LAUNCH
 import datas.HostData.Companion.JSON_TAG_UPDATE
 import datas.StartData.Companion.tryReceiveFileRequest
@@ -142,13 +139,11 @@ class Client(
                                 isHasGpsTime = jo["isHasGps"].toString().toBoolean()
                             }
 
+                            StartData.tryReceive(carrier)
                             tryReceiveFileRequest(carrier)
                         }
-                        socket!!.myOnFileReceivedListeners.add { fName ->
-                            var path = Globals.dirAppStorage.absolutePath + "/" + fName
-                            if (path.contains(".mp4"))
-                                path = createVideoURI(MyApp.appContext, fName).path!!
-                            HostData.get!!.clients.filterNot { it.fingerprint == fingerprint }.forEach { it.socket?.writeFile(File(path).readBytes(), fName) }
+                        socket!!.myOnFileReceivedListeners.add { path ->
+                            HostData.get!!.clients.filterNot { it.fingerprint == fingerprint }.forEach { it.socket?.writeFile(File(path).readBytes(), path) }
                             ActivityHome.invalidateFeedback()
                         }
                         socket!!.write(JSONObject(), JSON_TAG_LAUNCH)

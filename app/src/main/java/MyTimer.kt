@@ -14,7 +14,7 @@ class MyTimer {
         const val MIN_OBSERVATIONS = 3
         
         fun getTime():Long {
-            return if(GpsTime.numObservations < MIN_OBSERVATIONS) return System.currentTimeMillis()
+            return if(GpsTime.numObservations < MIN_OBSERVATIONS) System.currentTimeMillis()
             else GpsTime.timeOfBoot + SystemClock.elapsedRealtime()
         }
         

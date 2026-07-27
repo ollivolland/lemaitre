@@ -4,7 +4,6 @@ import Globals
 import MySocket
 import MyTimer
 import MyWifiP2p
-import MyWifiP2pActionListener
 import android.annotation.SuppressLint
 import android.app.TimePickerDialog
 import android.content.Intent
@@ -36,11 +35,9 @@ class ActivityHome : AppCompatActivity() {
     private lateinit var viewGlobal:ViewDevice
     private lateinit var viewConfigMe:ViewDevice
     private lateinit var viewConfigClients:Array<ViewDevice>
-    private val hasLaunched = mutableListOf<Long>()
     private val socketReadListeners = mutableListOf<Pair<MySocket, Int>>()
     private var isRunning = true
     private var isDialogsFinished = false
-    private var isFirstResume = true
 
 
     @SuppressLint("MissingPermission")
@@ -81,9 +78,7 @@ class ActivityHome : AppCompatActivity() {
         }
 
         //  *****   HOST
-        if(Session.isHost) {
-            val data = HostData.get!!
-
+        HostData.get?.also { data ->
             //  ui
             vButtons.visibility = View.VISIBLE
             val vStart = findViewById<ImageButton>(R.id.home_bStart)
@@ -170,9 +165,7 @@ class ActivityHome : AppCompatActivity() {
         }
 
         //  *****   CLIENT
-        else {
-            val data = ClientData.get!!
-            
+        ClientData.get?.also { data ->
             viewConfigMe = ViewDevice(this, vConfig)
             viewConfigMe.vTitle.text = data.deviceName
             viewConfigMe.vSettings.visibility = View.GONE
@@ -181,7 +174,8 @@ class ActivityHome : AppCompatActivity() {
 
             vDisconnect.setOnClickListener {
                 Toast.makeText(this, "disconnect", Toast.LENGTH_SHORT).show()
-                MyWifiP2p.get!!.manager.removeGroup(MyWifiP2p.get!!.channel, MyWifiP2pActionListener("manualCancelConnect"))
+                ClientData.get?.replaceSocket()
+//                MyWifiP2p.get!!.manager.removeGroup(MyWifiP2p.get!!.channel, MyWifiP2pActionListener("manualCancelConnect"))
             }
         }
 
@@ -203,16 +197,16 @@ class ActivityHome : AppCompatActivity() {
                 
                 //  start starts
                 for (x in Session.getStarts())
-                    if(!ActivityStart.isBusy && !hasLaunched.contains(x.id) && x.time < MyTimer.getTime() + TIME_START)
+                    if(!ActivityStart.isBusy && !Session.hasLaunched.contains(x.id) && x.time < MyTimer.getTime() + TIME_START)
                     {
-                        hasLaunched.add(x.id)
+                        Session.hasLaunched.add(x.id)
                         ActivityStart.launch(this, x)
                         invalidateFeedback()
                         Session.log("do start $x")
                     }
 
                 //  feedback
-                val all = Session.getStarts().filter { !hasLaunched.contains(it.id) }
+                val all = Session.getStarts().filter { !Session.hasLaunched.contains(it.id) }
                 
                 //  ui
                 runOnUiThread {
@@ -261,17 +255,13 @@ class ActivityHome : AppCompatActivity() {
     }
 
 
-    override fun onStart() {
-        super.onStart()
+    override fun onRestart() {
+        super.onRestart()
+        Session.log("ActivityHome onRestart")
 
-        if (isFirstResume) {
-            isFirstResume = false
-            return
-        }
-
-        if(Session.isClient) {
+        if(Session.isClient && MyTimer.getTime() - ClientData.get!!.lastUpdateReceived > TIME_CONNECTION_TIMEOUT) {
             ClientData.get?.replaceSocket()
-            Session.log("ActivityHome resumed => replaced")
+            Session.log("ActivityHome onRestart => replaced")
         }
     }
 
@@ -293,7 +283,7 @@ class ActivityHome : AppCompatActivity() {
         //  client config
         if(Session.isClient)
             when {
-                MyTimer.getTime() - ClientData.get!!.lastUpdate > TIME_CONNECTION_TIMEOUT ->
+                MyTimer.getTime() - ClientData.get!!.lastUpdateReceived > TIME_CONNECTION_TIMEOUT ->
                     viewConfigMe.updateView(Session.config, "", "[DISCONNECTED]")
                 !MyTimer.isHasGpsTime() ->
                     viewConfigMe.updateView(Session.config, "", "[NOGPS]")

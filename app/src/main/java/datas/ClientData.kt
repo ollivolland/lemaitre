@@ -4,6 +4,7 @@ import MyQueue
 import MySocket
 import MyTimer
 import android.content.Intent
+import android.os.SystemClock
 import com.google.firebase.crashlytics.FirebaseCrashlytics
 import com.ollivolland.lemaitre.ActivityHome
 import com.ollivolland.lemaitre.MainActivity
@@ -15,9 +16,11 @@ import kotlin.concurrent.thread
 
 class ClientData private constructor(val port: Int, val hostAddress:String, val deviceName:String, private var mainActivity: MainActivity?) {
     var socket: MySocket? = null
-    var lastUpdate = MyTimer.getTime()
+    var lastUpdateReceived = MyTimer.getTime()
+    var lastUpdateSent = SystemClock.uptimeMillis()
     var isHasHostGps = false
     val queue = MyQueue()
+    var threadUpDate: Thread? = null
 
 
     init {
@@ -58,7 +61,7 @@ class ClientData private constructor(val port: Int, val hostAddress:String, val 
 
                     //  update
                     carrier.optJSONObject(HostData.JSON_TAG_UPDATE)?.also { jo ->
-                        lastUpdate = MyTimer.getTime()
+                        lastUpdateReceived = MyTimer.getTime()
                         isHasHostGps = jo["isHasGps"].toString().toBoolean()
                     }
                 }
@@ -67,12 +70,13 @@ class ClientData private constructor(val port: Int, val hostAddress:String, val 
                 }
 
                 //  client update host
-                thread(name = "socketClientDataSendUpdate") {
+                threadUpDate = thread(name = "socketClientDataSendUpdate") {
                     while (socket?.isWantOpen == true) {
                         socket?.write(JSONObject().apply {
                             accumulate("time", MyTimer.getTime())
                             accumulate("isHasGps", MyTimer.isHasGpsTime())
                         }, HostData.JSON_TAG_UPDATE)
+                        lastUpdateSent = SystemClock.uptimeMillis()
 
                         Thread.sleep(1000)
                     }

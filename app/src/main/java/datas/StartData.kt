@@ -3,7 +3,6 @@ package datas
 import Globals
 import MyQueue
 import android.content.Intent
-import android.os.Environment
 import android.view.LayoutInflater
 import android.view.View
 import android.widget.ImageButton
@@ -79,7 +78,7 @@ data class StartData(val id:Long, val time:Long, val timeInitToCommand: Long, va
 
 
     fun save() {
-        File(Globals.dirStarts.absolutePath + "/$id.json").writeText(serialize().toString())
+        File("${Globals.dirStarts.absolutePath}/$id.json").writeText(serialize().toString())
     }
 
 
@@ -108,17 +107,17 @@ data class StartData(val id:Long, val time:Long, val timeInitToCommand: Long, va
 
         vButtons.removeAllViews()
 
-        var s = "start ${(if(isReceivedAll) "y" else "n")}"
+        var desc = "start ${(if(isReceivedAll) "y" else "n")}"
         if(commandDelay != null)
-            s += "\nshot: ${(commandDelay!! * .001).format(2)}s"
+            desc += "\nshot: ${(commandDelay!! * .001).format(2)}s"
         if(cameras.isNotEmpty()) {
-            s += "\n" + cameras.joinToString(", ")
+            desc += "\n" + cameras.joinToString(", ")
 
             for (c in cameras) {
                 val b = LayoutInflater.from(vButtons.context).inflate(R.layout.view_video, vButtons, false)
                 val bb = b.findViewById<ImageButton>(R.id.video_play)
-                val fileName = "VID_${Globals.formatToSeconds.format(Date(time))}_${c}.mp4"
-                val isFileExists = File("${Environment.getExternalStorageDirectory()}/${Environment.DIRECTORY_DCIM}/VID_${Globals.formatToSeconds.format(Date(time))}_${c}.mp4").exists()
+                val file = File("${Globals.dirDCIM}/VID_${Globals.formatToSeconds.format(Date(time))}_${c}.mp4")
+                val isFileExists = file.exists()
                 if(!isFileExists && c == Globals.deviceFingerprint)
                     continue
 
@@ -126,29 +125,41 @@ data class StartData(val id:Long, val time:Long, val timeInitToCommand: Long, va
                 if(isFileExists) {
                     bb.setImageResource(R.drawable.outline_play_48)
                     bb.setOnClickListener {
-                        val videoUri = "${Environment.getExternalStorageDirectory()}/${Environment.DIRECTORY_DCIM}/VID_${Globals.formatToSeconds.format(Date(time))}_${c}.mp4".toUri()
+                        val videoUri = "${Globals.dirDCIM}/VID_${Globals.formatToSeconds.format(Date(time))}_${c}.mp4".toUri()
                         itemView.context.startActivity(Intent(Intent.ACTION_VIEW, videoUri).apply {
                             setDataAndType(videoUri, "video/mp4")
                             addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
                         })
                     }
+                    vButtons.addView(b)
+
+
+                    val c = LayoutInflater.from(vButtons.context).inflate(R.layout.view_video, vButtons, false)
+                    val cc = c.findViewById<ImageButton>(R.id.video_play)
+                    cc.setImageResource(R.drawable.sharp_android_wifi_3_bar_24)
+                    cc.setOnClickListener {
+                        Session.queue { send(arrayOf(it)) }
+                        Session.socket { it.writeFile(file.readBytes(), file.path) }
+                        cc.isEnabled = false
+                    }
+                    vButtons.addView(c)
                 }
                 else {
                     bb.setImageResource(R.drawable.sharp_restart_alt_24)
                     bb.setOnClickListener {
-                        if(Session.isHost)
-                            HostData.get!!.clients.forEach { it.queue.sendJson(JSONObject().apply { put(HostData.KEY_REQUEST_FILE_PATH, fileName) }, HostData.TAG_REQUEST_FILE) }
-                        else
-                            ClientData.get!!.queue.sendJson(JSONObject().apply { put(HostData.KEY_REQUEST_FILE_PATH, fileName) }, HostData.TAG_REQUEST_FILE)
+                        Session.queue { it.sendJson(JSONObject().apply { put(HostData.KEY_REQUEST_FILE_PATH, file.path) }, HostData.TAG_REQUEST_FILE) }
                         bb.isEnabled = false
                     }
+                    vButtons.addView(b)
                 }
-                vButtons.addView(b)
             }
         }
 
-        vTitle.text = "${Globals.FORMAT_TIME.format(time)}"
-        vText.text = s
+        var title = Globals.FORMAT_TIME.format(time)
+        if(Globals.FORMAT_DAY_FILE.format(time) != Globals.FORMAT_DAY_FILE.format(System.currentTimeMillis()))
+            title = Globals.FORMAT_DAY_FILE.format(time) + " " + title
+        vTitle.text = title
+        vText.text = desc
     }
 
 
@@ -159,12 +170,8 @@ data class StartData(val id:Long, val time:Long, val timeInitToCommand: Long, va
         const val TAG_START_INFO = "start-info"
 
 
-        fun writeFileFromDCIM(path:String, fileName: String) {
-            if(Session.isHost) {
-                HostData.get!!.clients.forEach { it.socket?.writeFile(File(path).readBytes(), fileName) }
-            } else {
-                ClientData.get!!.socket?.writeFile(File(path).readBytes(), fileName)
-            }
+        fun writeFileFromDCIM(path:String) {
+            Session.socket { it.writeFile(File(path).readBytes(), path) }
             ActivityHome.invalidateFeedback()
         }
 
@@ -172,20 +179,12 @@ data class StartData(val id:Long, val time:Long, val timeInitToCommand: Long, va
         fun tryReceiveFileRequest(carrier: JSONObject?) {
             val jo = carrier?.optJSONObject(HostData.TAG_REQUEST_FILE) ?: return
 
-            Session.log("received File request")
-            val fileName = jo.optString(HostData.KEY_REQUEST_FILE_PATH, "")
-            if(fileName == "")
+            val path = jo.optString(HostData.KEY_REQUEST_FILE_PATH, "")
+            Session.log("received File request for $path")
+            if(path == "")
                 return
 
-            var path = Globals.dirAppStorage.absolutePath + "/" + fileName
-            if(path.contains(".mp4"))
-                path = Globals.dirDCIM.absolutePath + "/" + fileName
-            if(!File(path).exists()) {
-                Session.log("requested File not found $path")
-                return
-            }
-
-            writeFileFromDCIM(path, fileName)
+            writeFileFromDCIM(path)
         }
 
 

@@ -30,9 +30,10 @@ fun TextView.setString(text:String) {
 fun Double.format(digits: Int) = "%.${digits}f".format(this).replace(',', '.')
 
 
-fun createVideoURI(context: Context, displayName: String): Uri {
+fun createVideoURI(context: Context, filePath: String): Uri {
+    val fileName = filePath.replace("${Globals.dirDCIM.absolutePath}/", "")
     val values = ContentValues().apply {
-        put(MediaStore.MediaColumns.DISPLAY_NAME, displayName)
+        put(MediaStore.MediaColumns.DISPLAY_NAME, fileName)
         put(MediaStore.MediaColumns.MIME_TYPE, "video/mp4")
         put(MediaStore.MediaColumns.RELATIVE_PATH, Environment.DIRECTORY_DCIM)
     }

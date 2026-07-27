@@ -38,6 +38,7 @@ dependencies {
     implementation 'androidx.core:core-ktx:1.7.0'   //  don't upgrade, may cause duplicateClassException
     implementation 'androidx.appcompat:appcompat:1.4.1'
     implementation 'com.google.android.material:material:1.8.0'
+    implementation "androidx.lifecycle:lifecycle-process:2.8.4"
 
     //  firebase
     implementation platform('com.google.firebase:firebase-bom:30.0.1')

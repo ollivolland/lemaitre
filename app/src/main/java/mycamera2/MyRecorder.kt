@@ -1,19 +1,21 @@
 package mycamera2
 
 import Globals
+import Vec
 import android.hardware.camera2.CameraCharacteristics
 import android.media.MediaCodec
 import android.media.MediaCodecInfo
 import android.media.MediaFormat
 import android.media.MediaMuxer
 import android.os.Bundle
-import android.os.Environment
 import android.os.ParcelFileDescriptor
 import android.util.Log
 import createVideoURI
+import datas.Session
 import datas.StartData
 import java.io.File
 import java.util.Date
+import kotlin.math.atan
 
 class MyRecorder internal constructor(private val myCamera2: MyCamera2, private val recordingProfileBuilder: RecordingProfileBuilder, private val ts: Long) {
 	private val codec: MediaCodec
@@ -29,15 +31,38 @@ class MyRecorder internal constructor(private val myCamera2: MyCamera2, private 
 		val surfaceObservable = myCamera2.addSurface()
 		
 		//  Format
-		val fileName = "VID_${Globals.formatToSeconds.format(Date(ts))}_${Globals.deviceFingerprint}.mp4"
+		val path = "${Globals.dirDCIM}/VID_${Globals.formatToSeconds.format(Date(ts))}_${Globals.deviceFingerprint}.mp4"
 		val mimeType = MediaFormat.MIMETYPE_VIDEO_AVC
-		val pdf: ParcelFileDescriptor = myCamera2.context.contentResolver.openFileDescriptor(createVideoURI(myCamera2.context, fileName), "w")!!
+		val pdf: ParcelFileDescriptor = myCamera2.context.contentResolver.openFileDescriptor(createVideoURI(myCamera2.context, path), "w")!!
 		val format = MediaFormat.createVideoFormat(mimeType, recordingProfile.width, recordingProfile.height)
 		format.setInteger(MediaFormat.KEY_COLOR_FORMAT, MediaCodecInfo.CodecCapabilities.COLOR_FormatSurface)
 		format.setInteger(MediaFormat.KEY_BIT_RATE, recordingProfile.bytesPerSecond * 8)
 		format.setInteger(MediaFormat.KEY_FRAME_RATE, recordingProfile.fps)
 		format.setInteger(MediaFormat.KEY_I_FRAME_INTERVAL, 1)
-		
+
+
+		val focalLength = myCamera2.characteristics.get(CameraCharacteristics.LENS_INFO_AVAILABLE_FOCAL_LENGTHS)?.firstOrNull()
+		val sensorSize = myCamera2.characteristics.get(CameraCharacteristics.SENSOR_INFO_PHYSICAL_SIZE)
+		val arraySize = myCamera2.characteristics.get(CameraCharacteristics.SENSOR_INFO_PIXEL_ARRAY_SIZE)
+		val activeArrayPreCorrective = myCamera2.characteristics.get(CameraCharacteristics.SENSOR_INFO_PRE_CORRECTION_ACTIVE_ARRAY_SIZE)
+		val activeArray = myCamera2.characteristics.get(CameraCharacteristics.SENSOR_INFO_ACTIVE_ARRAY_SIZE)
+		if(focalLength != null && sensorSize != null && arraySize != null && activeArray != null && activeArrayPreCorrective != null) {
+			val fovPreCorrective = Vec.create(
+				atan(sensorSize.width * (activeArrayPreCorrective.width().toDouble() / arraySize.width) / (focalLength * 2f)),
+				atan(sensorSize.height * (activeArrayPreCorrective.height().toDouble() / arraySize.height) / (focalLength * 2f))
+			) * 2.0 * 180.0 / Math.PI
+			val fov = Vec.create(
+				atan(sensorSize.width * (activeArray.width().toDouble() / arraySize.width) / (focalLength * 2f)),
+				atan(sensorSize.height * (activeArray.height().toDouble() / arraySize.height) / (focalLength * 2f))
+			) * 2.0 * 180.0 / Math.PI
+
+			Session.log("fov preCorrective ${fovPreCorrective[0]}x${fovPreCorrective[1]}")
+			Session.log("fov ${fov[0]}x${fov[1]}")
+			Session.log("sensor array size ${arraySize.width}x${arraySize.height}")
+			Session.log("active array ${activeArray.width()}x${activeArray.height()}")
+			Session.log("active array preCorrective ${activeArrayPreCorrective.width()}x${activeArrayPreCorrective.height()}")
+		}
+
 		//  Muxer
 		muxer = MediaMuxer(pdf.fileDescriptor, MediaMuxer.OutputFormat.MUXER_OUTPUT_MPEG_4)
 		var track:Int = -1
@@ -102,9 +127,9 @@ class MyRecorder internal constructor(private val myCamera2: MyCamera2, private 
 			stopRecord()
 			
 			if(!isWantStart)
-				File("${Environment.getExternalStorageDirectory()}/${Environment.DIRECTORY_DCIM}/$fileName").delete()
+				File(path).delete()
 			else
-				StartData.writeFileFromDCIM("${Environment.getExternalStorageDirectory()}/${Environment.DIRECTORY_DCIM}/$fileName", fileName)
+				StartData.writeFileFromDCIM(path)
 		}
 		
 		//  rotation

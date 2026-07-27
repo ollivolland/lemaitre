@@ -1,6 +1,8 @@
 package datas
 
 import Globals
+import MyQueue
+import MySocket
 import com.ollivolland.lemaitre.ActivityHome
 import com.ollivolland.lemaitre.MyApp
 import org.json.JSONObject
@@ -10,7 +12,8 @@ import java.io.File
 class Session {
     companion object {
         private var mState: State = State.NONE
-        private val mStarts = Globals.dirStarts.listFiles().asSequence().map { StartData.parse(JSONObject(File(it.path).readText())) }.mapNotNull { it }.sortedByDescending { it.time }.take(10).toMutableList()
+        private val mStarts = mutableListOf<StartData>()
+        val hasLaunched = mutableListOf<Long>()
         private val mLogs = mutableListOf<String>()
         private var mConfig: ConfigData = ConfigData("null")
         var config:ConfigData
@@ -19,6 +22,14 @@ class Session {
         
         var isHost:Boolean = false;private set
         var isClient:Boolean = false;private set
+
+
+        init {
+            for (s in Globals.dirStarts.listFiles()?.asSequence()?.map { StartData.parse(JSONObject(File(it.path).readText())) }?.mapNotNull { it }?.sortedByDescending { it.time }?.take(10) ?: sequenceOf()) {
+                mStarts.add(s)
+                hasLaunched.add(s.id)
+            }
+        }
 
 
         fun setState(state: State) {
@@ -31,7 +42,7 @@ class Session {
 
 
         fun addStart(data: StartData) { synchronized(mStarts) {
-            mStarts.add(data)
+            mStarts.add(0, data)
             data.save()
             ActivityHome.invalidateFeedback()
         } }
@@ -47,6 +58,25 @@ class Session {
                 .appendText("\n\n${Globals.FORMAT_LOGCAT.format(time)} ${android.os.Process.myPid()}-${android.os.Process.myTid()} TAG ${MyApp.packageName} V \n\t$string")
         }
         fun getLogs():Array<String> { synchronized(mLogs) { return mLogs.toTypedArray() } }
+
+
+        fun queue(f:(MyQueue)->Unit) {
+            HostData.get?.also { data ->
+                data.clients.forEach { f(it.queue) }
+            }
+            ClientData.get?.also { data ->
+                f(data.queue)
+            }
+        }
+
+        fun socket(f:(MySocket)->Unit) {
+            HostData.get?.also { data ->
+                data.clients.forEach { if(it.socket != null) f(it.socket!!) }
+            }
+            ClientData.get?.also { data ->
+                if(data.socket != null) f(data.socket!!)
+            }
+        }
     }
     
     enum class State { NONE, HOST, CLIENT }

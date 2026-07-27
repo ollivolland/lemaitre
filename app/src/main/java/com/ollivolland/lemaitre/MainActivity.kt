@@ -71,21 +71,20 @@ class MainActivity : Activity() {
             Manifest.permission.CAMERA)
         if (Build.VERSION.SDK_INT >= 33) permissions.add(Manifest.permission.NEARBY_WIFI_DEVICES)
         val toGrant = permissions.filter { s -> checkSelfPermission(s) != PackageManager.PERMISSION_GRANTED }.toTypedArray()
-
         if (toGrant.isNotEmpty()) requestPermissions(toGrant, 1)
         
-        //  files
+        //  dirs
         for (x in arrayOf(Globals.dirStarts, Globals.dirLogs))
             if(!x.exists())
                 x.mkdir()
 
+        //  files
         for (x in arrayOf("${Globals.dirLogs.absolutePath}/log-${Globals.FORMAT_DAY_FILE.format(System.currentTimeMillis())}.txt"))
             if(!File(x).exists())
                 File(x).createNewFile()
 
-        val dir = getExternalFilesDir(null)
-        if(!File("$dir\\$PATH_SENSITIVITY").exists())
-            File("$dir\\$PATH_SENSITIVITY").writeText("1000")
+        if(!File("${Globals.dirAppStorage.absolutePath}/$PATH_SENSITIVITY").exists())
+            File("${Globals.dirAppStorage.absolutePath}/$PATH_SENSITIVITY").writeText("1000")
 
         //  ui
         vHost = findViewById(R.id.buttonHost)
@@ -113,8 +112,7 @@ class MainActivity : Activity() {
         }
 
         //  setup
-        Session.log("sdk ${Build.VERSION.SDK_INT}")
-        Session.log("version ${applicationContext.packageManager.getPackageInfo(applicationContext.packageName, 0).versionCode}")
+        Session.log("device ${Globals.deviceFingerprint}, sdk ${Build.VERSION.SDK_INT}, appversion ${applicationContext.packageManager.getPackageInfo(applicationContext.packageName, 0).versionCode}")
 
         //  enable wifi
         if(!wifiManager.isWifiEnabled) {

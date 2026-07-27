@@ -34,7 +34,8 @@ class MyCamera2(val context: Activity) {
 	val cameraDeviceObservable = ValueObservable<CameraDevice>({ tryCreateSession() })
 	val cameraManager = context.getSystemService(Context.CAMERA_SERVICE) as CameraManager
 	val onCloseListeners = mutableListOf<() -> Unit>()
-	private val backgroundThread: HandlerThread = HandlerThread("myCamera2 thread").apply { start() }
+	val characteristics: CameraCharacteristics
+    private val backgroundThread: HandlerThread = HandlerThread("myCamera2 thread").apply { start() }
 	private val backgroundHandler: Handler = Handler(backgroundThread.looper)
 	private var captureSession:CameraCaptureSession? = null
 	private val surfaces = mutableListOf<ValueObservable<Surface>>()
@@ -49,11 +50,12 @@ class MyCamera2(val context: Activity) {
 			.filter { cameraManager.getCameraCharacteristics(it)[CameraCharacteristics.LENS_FACING] == CameraCharacteristics.LENS_FACING_BACK }[0]
 		
 		//  capabilities
-		val characteristics = cameraManager.getCameraCharacteristics(cameraId)
+		characteristics = cameraManager.getCameraCharacteristics(cameraId)
 		val capabilities = characteristics.get(CameraCharacteristics.REQUEST_AVAILABLE_CAPABILITIES)
 		val streamConfigurationMap = characteristics.get(CameraCharacteristics.SCALER_STREAM_CONFIGURATION_MAP)
 		sizes = streamConfigurationMap?.getOutputSizes(ImageFormat.JPEG) ?: emptyArray()
-		
+
+
 		//  (1) open cameraDevice
 		if (context.checkSelfPermission(Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED)
 			cameraManager.openCamera(cameraId, object: CameraDevice.StateCallback() {
@@ -134,10 +136,13 @@ class MyCamera2(val context: Activity) {
 
 					//  (3) create Request, only ONE Request is allowed!
 					val captureBuilder = cameraDeviceObservable.value.createCaptureRequest(CameraDevice.TEMPLATE_RECORD)
-					captureBuilder[CaptureRequest.CONTROL_AF_MODE] = CaptureRequest.CONTROL_AF_MODE_CONTINUOUS_PICTURE
+					captureBuilder[CaptureRequest.CONTROL_AF_MODE] = CaptureRequest.CONTROL_AF_MODE_CONTINUOUS_VIDEO
 					captureBuilder[CaptureRequest.CONTROL_AE_MODE] = CaptureRequest.CONTROL_AE_MODE_ON
 					captureBuilder[CaptureRequest.CONTROL_AWB_MODE] = CaptureRequest.CONTROL_AWB_MODE_AUTO
 					captureBuilder[CaptureRequest.CONTROL_AE_TARGET_FPS_RANGE] = Range(fps, fps)
+
+					captureBuilder[CaptureRequest.CONTROL_VIDEO_STABILIZATION_MODE] = CaptureRequest.CONTROL_VIDEO_STABILIZATION_MODE_OFF
+					captureBuilder[CaptureRequest.LENS_OPTICAL_STABILIZATION_MODE] = CaptureRequest.LENS_OPTICAL_STABILIZATION_MODE_OFF
 
 					for (surface in surfaces)
 						captureBuilder.addTarget(surface.value)

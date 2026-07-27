@@ -36,7 +36,7 @@ open class MySocket(val socket: Socket, private val type:String) {
         var length:Int
         var fos: FileOutputStream? = null
         var fileLength = 0L
-        var fileName: String? = null
+        var filePath: String? = null
         
         //  read
         while(isWantOpen) {
@@ -53,42 +53,42 @@ open class MySocket(val socket: Socket, private val type:String) {
                     {
                         fos.flush()
                         fos.close()
-                        myOnFileReceivedListeners.forEach { it?.invoke(fileName!!) }
+                        myOnFileReceivedListeners.forEach { it?.invoke(filePath!!) }
+                        Session.log("[${socket.port}] received File $filePath")
                         fos = null
-                        fileName = null
-                        Session.log("File completed")
+                        filePath = null
                     }
                     continue
                 }
     
                 //  listeners
-                if(myOnJSONListeners.isNotEmpty()) {
-                    try {
-                        val carrier = JSONObject(String(buffer, 0, length))
-                        if(!carrier.has(JSON_TAG_UPDATE))
-                            Session.log("[${socket.port}] received JSON ${carrier.keys().asSequence().joinToString(", ")}")
+                val carrier = JSONObject(String(buffer, 0, length))
+                try {
+                    if(!carrier.has(JSON_TAG_UPDATE))
+                        Session.log("[${socket.port}] received JSON ${carrier.keys().asSequence().joinToString(", ")}")
 
-                        carrier.optJSONObject(TAG_FILE)?.also { jo ->
-                            fileLength = jo.optLong(TAG_SIZE, 0)
-                            fileName = jo.optString(TAG_NAME, "_.txt")
-                            val path = Globals.dirAppStorage.absolutePath + "/" + jo.optString(TAG_NAME, "_.txt")
-                            Session.log("[${socket.port}] received File $fileLength at $path")
-                            File(path).createNewFile()
-
-                            if(path.contains(".mp4"))
-                                fos = MyApp.appContext.contentResolver.openOutputStream(createVideoURI(MyApp.appContext, fileName)) as FileOutputStream?
-                            else {
-                                fos = FileOutputStream(path)
-                            }
+                    carrier.optJSONObject(TAG_FILE)?.also { jo ->
+                        fileLength = jo.optLong(KEY_SIZE, 0)
+                        filePath = jo.optString(KEY_FILEPATH, "${Globals.dirAppStorage.absolutePath}/_.txt")
+                        Session.log("[${socket.port}] receiving File $fileLength at $filePath")
+                        if(File(filePath).exists()) {
+                            Session.log("[${socket.port}] received File $filePath already exists")
+                            filePath = null
+                            fileLength = 0L
                         }
-            
-                        for (x in myOnJSONListeners)
-                            try { x?.invoke(carrier) }
-                            catch (e:Exception) { e.printStackTrace() }
-                    } catch (e:Exception) {
-                        e.printStackTrace()
+                        else
+                            fos = (if(filePath.startsWith(Globals.dirDCIM.absolutePath)) {
+                                Session.log("[${socket.port}] File is Video-URI ${Globals.dirDCIM.absolutePath}||${filePath.replace("${Globals.dirDCIM.absolutePath}/", "")}")
+                                MyApp.appContext.contentResolver.openOutputStream(createVideoURI(MyApp.appContext, filePath)) as FileOutputStream?
+                            } else FileOutputStream(filePath))
                     }
+                } catch (e:Exception) {
+                    e.printStackTrace()
                 }
+
+                for (x in myOnJSONListeners)
+                    try { x?.invoke(carrier) }
+                    catch (e:Exception) { e.printStackTrace() }
             } catch (e:Exception) {
                 Log.e("SOCKET", "exception ${e.stackTrace}")
                 e.printStackTrace()
@@ -129,8 +129,9 @@ open class MySocket(val socket: Socket, private val type:String) {
     }
 
 
-    fun writeFile(byteArray: ByteArray, name: String) {
-        write(JSONObject().apply { put(TAG_NAME, name);put(TAG_SIZE, byteArray.size) }, TAG_FILE)
+    fun writeFile(byteArray: ByteArray, path: String) {
+        Session.log("[${socket.port}] sent File $path")
+        write(JSONObject().apply { put(KEY_FILEPATH, path);put(KEY_SIZE, byteArray.size) }, TAG_FILE)
         write(byteArray)
     }
 
@@ -181,8 +182,8 @@ open class MySocket(val socket: Socket, private val type:String) {
     companion object {
         val log:((String)->Unit) = { it -> Session.log(it) }
         val TAG_FILE = "@File"
-        val TAG_NAME = "@File-name"
-        val TAG_SIZE = "@File-size"
+        val KEY_FILEPATH = "@File-name"
+        val KEY_SIZE = "@File-size"
     }
 }
 

@@ -260,8 +260,8 @@ class ActivityHome : AppCompatActivity() {
         Session.log("ActivityHome onRestart")
 
         if(Session.isClient && MyTimer.getTime() - ClientData.get!!.lastUpdateReceived > TIME_CONNECTION_TIMEOUT) {
-            ClientData.get?.replaceSocket()
             Session.log("ActivityHome onRestart => replaced")
+            ClientData.get?.replaceSocket()
         }
     }
 

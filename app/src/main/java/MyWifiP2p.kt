@@ -51,8 +51,8 @@ class MyWifiP2p(private val activity: MainActivity, private val mConnectionInfoL
 //							} }
 //							.setIconAttribute(R.attr.alertDialogIcon)
 //							.show()
-						Session.log("RESTART THE APP; NETWORK IS BUGGED")
-//						manager.
+						disconnectAll()
+						Session.logE("RESTART THE APP; NETWORK IS BUGGED")
 					}
 
 					// Respond to new connection or disconnections

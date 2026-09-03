@@ -33,16 +33,13 @@ import kotlin.concurrent.thread
 
 class MainActivity : Activity() {
     //  by urgency
-    //  todo    CRASHES CAUSE of gps permisson
     //  todo    check if cam profile is available
     //  todo    video timestamp
     //  todo    stop start on all devices
     //  todo    dialog spinner info
     //  todo    display storage space
-    //  todo    Filesharing with uri/path instead of filename
-    //  todo    perspective
-    //  todo    move frame
-    //  todo    audioTrack instead of MediaPlayer   https://stackoverflow.com/questions/12263671/audiotrack-android-playing-sounds-from-raw-folder
+    //  audioTrack instead of MediaPlayer   https://stackoverflow.com/questions/12263671/audiotrack-android-playing-sounds-from-raw-folder
+    //  todo    save perspective info by video name
 
     //  BUGS
     
@@ -77,7 +74,7 @@ class MainActivity : Activity() {
         //  dirs
         for (x in arrayOf(Globals.dirStarts, Globals.dirLogs))
             if(!x.exists())
-                x.mkdir()
+                x.mkdirs()
 
         //  files
         for (x in arrayOf("${Globals.dirLogs.absolutePath}/log-${Globals.FORMAT_DAY_FILE.format(System.currentTimeMillis())}.txt"))

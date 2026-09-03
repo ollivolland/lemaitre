@@ -10,7 +10,7 @@ class Globals {
 
     companion object {
         const val DIR_NAME = "lemaitre"
-        val dirAppStorage = File("${Environment.getExternalStorageDirectory().absolutePath}/Android/data/com.ollivolland.lemaitre")
+        val dirAppStorage = File("${Environment.getExternalStorageDirectory().absolutePath}/Android/media/com.ollivolland.lemaitre")
         val dirStarts = File("${dirAppStorage.absolutePath}/starts")
         val dirLogs = File("${dirAppStorage.absolutePath}/logs")
         val dirDownload = File("${Environment.getExternalStorageDirectory().absolutePath}/Download")

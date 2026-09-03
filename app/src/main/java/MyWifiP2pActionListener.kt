@@ -31,7 +31,7 @@ class MyWifiP2pActionListener(private val message:String = ""): WifiP2pManager.A
     override fun onFailure(p0: Int) {
         if(message.isNotEmpty()) {
             Log.e("System.out", "$message fail: $p0")
-            Session.log("ERROR: $message fail: $p0")
+            Session.logE("ERROR: $message fail: $p0")
         }
         myFailure()
         myComplete()

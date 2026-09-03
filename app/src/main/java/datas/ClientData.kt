@@ -21,6 +21,7 @@ class ClientData private constructor(val port: Int, val hostAddress:String, val 
     var isHasHostGps = false
     val queue = MyQueue()
     var threadUpDate: Thread? = null
+    private var timeReplacedSocket = 0L
 
 
     init {
@@ -33,13 +34,14 @@ class ClientData private constructor(val port: Int, val hostAddress:String, val 
 
     fun replaceSocket() {
         Session.log("replaceSocket")
+        val myTimeReplaceSocket = SystemClock.uptimeMillis()
+        timeReplacedSocket = myTimeReplaceSocket
         socket?.socket?.close()
         socket?.close()
         socket = MySocket(Socket(), "client")
         thread {
-            Thread.sleep(1000)
             try {
-                socket!!.socket.connect(InetSocketAddress(hostAddress, port), 60_000)
+                socket!!.socket.connect(InetSocketAddress(hostAddress, port), 10_000)
                 queue.attach(socket!!)
                 socket!!.addOnJson { carrier ->
                     //  launch
@@ -84,9 +86,13 @@ class ClientData private constructor(val port: Int, val hostAddress:String, val 
 
                 socket!!.setSocketConfigured()
             } catch (e: Exception) {
-                Session.log("reconnection crashed")
+                Session.logE("client reconnection crashed")
                 println(e.printStackTrace())
                 FirebaseCrashlytics.getInstance().recordException(e)
+                Thread.sleep(1000)
+
+                if(timeReplacedSocket == myTimeReplaceSocket)
+                    replaceSocket()
             }
         }
     }

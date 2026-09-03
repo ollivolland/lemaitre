@@ -243,20 +243,18 @@ data class StartData(val id:Long, val time:Long, val timeInitToCommand: Long, va
 
 
         fun tryReceive(carrier:JSONObject) {
-            parse(carrier.optJSONObject(TAG_START), Session.config.copy())?.also { start ->
+            var start = parse(carrier.optJSONObject(TAG_START), Session.config.copy()) ?: return
+
+            val startSaved = Session.getStarts().firstOrNull { it.id == start.id }
+            if (startSaved == null) {
                 Session.addStart(start)
                 Session.log("received start $start")
+            } else {
+                start = startSaved
+                Session.log("start already present $start")
             }
 
             carrier.optJSONObject(TAG_START_INFO)?.also { jo ->
-                val id = jo.getLong("id")
-                val start = Session.getStarts().firstOrNull { it.id == id }
-                if(start == null)
-                {
-                    Session.log("JSON_TAG_INFO ERROR DIDNT FIND ID")
-                    return
-                }
-
                 start.receiveInfo(jo.optJSONObject("info"))
                 start.save()
             }

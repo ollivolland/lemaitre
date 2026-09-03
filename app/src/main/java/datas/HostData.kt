@@ -151,7 +151,7 @@ class Client(
                         socket!!.setSocketConfigured()
                     }
                 } catch (e: Exception) {
-                    Session.log("connection crashed")
+                    Session.logE("host connection crashed")
                     println(e.printStackTrace())
                     FirebaseCrashlytics.getInstance().recordException(e)
                 }

@@ -49,14 +49,15 @@ class Session {
         fun getStarts():Array<StartData> { synchronized(mStarts) { return mStarts.toTypedArray() } }
 
 
-        fun log(string: String) {
+        fun log(string: String, importance: String = "V") {
             println(string)
             synchronized(mLogs) { mLogs.add(string) }
 
             val time = System.currentTimeMillis()
             File("${Globals.dirLogs.absolutePath}/log-${Globals.FORMAT_DAY_FILE.format(time)}.txt")
-                .appendText("\n\n${Globals.FORMAT_LOGCAT.format(time)} ${android.os.Process.myPid()}-${android.os.Process.myTid()} TAG ${MyApp.packageName} V \n\t$string")
+                .appendText("\n\n[${Globals.FORMAT_LOGCAT.format(time)} ${MyApp.packageName}:${android.os.Process.myPid()}:${android.os.Process.myTid()} $importance/TAG] \n\t$string")
         }
+        fun logE(string: String) = log(string, "E")
         fun getLogs():Array<String> { synchronized(mLogs) { return mLogs.toTypedArray() } }
 
 
